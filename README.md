@@ -15,3 +15,5 @@ A small React + TypeScript + Tailwind CSS canvas prototype built with Vite.
 - Pan with Space + primary mouse button
 - Zoom from 10% to 400% with the mouse wheel
 - Centered initial viewport and a reset control
+
+Учебный проект
