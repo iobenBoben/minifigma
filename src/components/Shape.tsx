@@ -27,7 +27,7 @@ export function Shape({ shape, isSelected, isGhost = false, onSelect, onMoveStar
       }}
       className={`absolute touch-none border ${
         onMoveStart ? 'cursor-move' : 'cursor-default'
-      } ${isSelected && !isGhost ? 'ring-2 ring-[#8b7cff]' : ''} ${
+      } ${isSelected && !isGhost ? 'ring-2 ring-[#8290ee]' : ''} ${
         isGhost ? 'opacity-70' : ''
       }`}
       style={{

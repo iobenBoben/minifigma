@@ -2,8 +2,8 @@
 
 :root {
   font-family: "Aptos", "Segoe UI Variable", "Segoe UI", sans-serif;
-  color: #f4f2ff;
-  background: #0b0c10;
+  color: #f2f4fb;
+  background: #0a0c11;
   color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -38,7 +38,7 @@ button {
 
 ::selection {
   color: #ffffff;
-  background: #6c5ce7;
+  background: #5b6bd8;
 }
 
 ::-webkit-scrollbar {

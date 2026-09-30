@@ -32,7 +32,7 @@ export function LayersPanel({ shapes, selectedShapeId, onSelectShape }: LayersPa
                 onClick={() => onSelectShape(shape.id)}
                 className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[11px] transition ${
                   selectedShapeId === shape.id
-                    ? 'bg-[#6c5ce7]/18 text-[#c9c1ff]'
+                    ? 'bg-[#5b6bd8]/18 text-[#c2c8f5]'
                     : 'text-[#8b8aa3] hover:bg-white/6 hover:text-[#e7e4f5]'
                 }`}
               >

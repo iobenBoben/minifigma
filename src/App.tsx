@@ -36,7 +36,7 @@ export default function App() {
             </p>
           </div>
           <span
-            className="size-2 rounded-full bg-[#6c5ce7] ring-4 ring-[#6c5ce7]/15"
+            className="size-2 rounded-full bg-[#5b6bd8] ring-4 ring-[#5b6bd8]/15"
             aria-label="Document saved"
           />
         </header>

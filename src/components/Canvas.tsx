@@ -9,8 +9,8 @@ import { Shape } from './Shape'
 const GRID_SIZE = 20
 const DEFAULT_SHAPE_SIZE = 120
 const SHAPE_PALETTE: Record<ShapeType, { fill: string; stroke: string }> = {
-  rectangle: { fill: '#5b4bda', stroke: '#8b7cff' },
-  ellipse: { fill: '#157a6e', stroke: '#34d3b8' },
+  rectangle: { fill: '#4a5bc4', stroke: '#8290ee' },
+  ellipse: { fill: '#1a6f80', stroke: '#3fc4d4' },
 }
 
 interface CanvasProps {
@@ -183,7 +183,7 @@ export function Canvas({
           className="pointer-events-none absolute inset-0"
           style={{
             backgroundImage:
-              'linear-gradient(to right, rgba(181, 175, 255, 0.09) 1px, transparent 1px), linear-gradient(to bottom, rgba(181, 175, 255, 0.09) 1px, transparent 1px)',
+              'linear-gradient(to right, rgba(160, 178, 230, 0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(160, 178, 230, 0.10) 1px, transparent 1px)',
             backgroundPosition: `${viewport.pan.x}px ${viewport.pan.y}px`,
             backgroundSize: `${GRID_SIZE * viewport.zoom}px ${GRID_SIZE * viewport.zoom}px`,
           }}

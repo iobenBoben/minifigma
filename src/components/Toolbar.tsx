@@ -36,8 +36,8 @@ export function Toolbar({ activeTool, onToolChange }: ToolbarProps) {
               onClick={() => onToolChange(tool.id)}
               className={`group relative flex size-10 items-center justify-center rounded-xl transition ${
                 activeTool === tool.id
-                  ? 'bg-[#6c5ce7] text-white shadow-[0_8px_24px_rgba(108,92,231,0.32)]'
-                  : 'text-[#8b8aa3] hover:bg-white/7 hover:text-[#f4f2ff]'
+                  ? 'bg-[#5b6bd8] text-white shadow-[0_8px_24px_rgba(91,107,216,0.32)]'
+                  : 'text-[#86889e] hover:bg-white/7 hover:text-[#f2f4fb]'
               }`}
               aria-label={`${tool.label} (${tool.shortcut})`}
               aria-pressed={activeTool === tool.id}
