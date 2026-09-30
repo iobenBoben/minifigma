@@ -28,19 +28,19 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
       - name: Install dependencies
         run: npm ci
 
+      # vite.config.ts содержит base: '/minifigma/', поэтому Vite сам
+      # проставляет префикс /minifigma во все пути к ресурсам в сборке.
       - name: Build
         run: npm run build
 
-      # Pages публикует проект по адресу /minifigma/, поэтому в собранный
-      # index.html нужно подставить префикс /minifigma.
-      - name: Rewrite asset paths for Pages subpath
-        run: |
-          sed -i 's|"/assets/|"/minifigma/assets/|g' dist/index.html
-          sed -i "s|='/assets/|='/minifigma/assets/|g" dist/index.html
-          grep -o '/minifigma/assets/[^"]*' dist/index.html
+      - name: Verify asset paths
+        run: grep -q '/minifigma/assets/' dist/index.html
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
