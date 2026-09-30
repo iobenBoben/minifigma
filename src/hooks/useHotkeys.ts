@@ -11,6 +11,13 @@ const TOOL_BY_KEY = Object.entries(TOOL_KEY_BINDINGS).reduce<Record<string, Tool
   {},
 )
 
+interface UseHotkeysOptions {
+  onToolChange: (tool: Tool) => void
+  onDelete: () => void
+  onDuplicate: () => void
+  onEscape: () => void
+}
+
 function isTypingTarget(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLInputElement ||
@@ -20,10 +27,34 @@ function isTypingTarget(target: EventTarget | null): boolean {
   )
 }
 
-export function useHotkeys(onToolChange: (tool: Tool) => void): void {
+export function useHotkeys({
+  onToolChange,
+  onDelete,
+  onDuplicate,
+  onEscape,
+}: UseHotkeysOptions): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat || isTypingTarget(event.target)) return
+      if (isTypingTarget(event.target)) return
+
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault()
+        onDuplicate()
+        return
+      }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault()
+        onDelete()
+        return
+      }
+
+      if (event.key === 'Escape') {
+        onEscape()
+        return
+      }
+
+      if (event.repeat) return
 
       const tool = TOOL_BY_KEY[event.key.toLowerCase()]
       if (!tool) return
@@ -34,5 +65,5 @@ export function useHotkeys(onToolChange: (tool: Tool) => void): void {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onToolChange])
+  }, [onDelete, onDuplicate, onEscape, onToolChange])
 }

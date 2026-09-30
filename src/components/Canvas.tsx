@@ -1,38 +1,80 @@
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
+import { DEFAULT_FRAME_SIZE, DEFAULT_TOOL, SHAPE_PALETTE, createShape } from '../constants/tools'
 import { useViewport } from '../hooks/useViewport'
-import type { Point, Shape as ShapeModel, ShapeType, Tool } from '../types/shape'
-import { rectFromPoints, screenToCanvas } from '../utils/geometry'
+import type { Shape as ShapeModel, ShapeType, Tool } from '../types/shape'
+import { clamp, rectFromPoints, screenToCanvas } from '../utils/geometry'
 import { Shape } from './Shape'
 
 const GRID_SIZE = 20
-const DEFAULT_SHAPE_SIZE = 120
-const SHAPE_PALETTE: Record<ShapeType, { fill: string; stroke: string }> = {
-  rectangle: { fill: '#4a5bc4', stroke: '#8290ee' },
-  ellipse: { fill: '#1a6f80', stroke: '#3fc4d4' },
-}
+const DEFAULT_DRAG_SIZE = 140
+const DEFAULT_TEXT_SIZE = { width: 180, height: 32 }
+const HANDLE_SIZE = 8
+const CURSORS = {
+  nw: 'nwse-resize',
+  n: 'ns-resize',
+  ne: 'nesw-resize',
+  e: 'ew-resize',
+  se: 'nwse-resize',
+  s: 'ns-resize',
+  sw: 'nesw-resize',
+  w: 'ew-resize',
+} as const
+
+type Handle = keyof typeof CURSORS
 
 interface CanvasProps {
   shapes: ShapeModel[]
-  selectedShapeId: string | null
+  flat: ReturnType<typeof import('../utils/tree').flattenTree>
+  selectedId: string | null
   activeTool: Tool
-  onAddShape: (shape: ShapeModel) => void
-  onUpdateShape: (id: string, updates: Partial<Omit<ShapeModel, 'id'>>) => void
-  onSelectShape: (id: string | null) => void
+  onAddShape: (shape: ShapeModel, parentId?: string | null) => void
+  onUpdateShape: (id: string, updates: Partial<ShapeModel>) => void
+  onSelect: (id: string | null) => void
+  onReorder: (id: string, parentId: string | null, index?: number) => void
+  dropTargetId: string | null
+  setDropTargetId: (id: string | null) => void
 }
 
 type Interaction =
-  | { kind: 'draw'; tool: ShapeType; start: Point; pointerId: number }
-  | { kind: 'move'; shapeId: string; start: Point; origin: Point; pointerId: number }
+  | {
+      kind: 'draw'
+      tool: ShapeType
+      start: { x: number; y: number }
+      current: { x: number; y: number }
+      equalSides: boolean
+      pointerId: number
+      parentId: string | null
+    }
+  | {
+      kind: 'move'
+      nodeId: string
+      parentId: string | null
+      startCanvas: { x: number; y: number }
+      origin: { x: number; y: number }
+      pointerId: number
+    }
+  | {
+      kind: 'resize'
+      nodeId: string
+      handle: Handle
+      startCanvas: { x: number; y: number }
+      origin: { x: number; y: number; width: number; height: number }
+      pointerId: number
+    }
 
 export function Canvas({
   shapes,
-  selectedShapeId,
+  flat,
+  selectedId,
   activeTool,
   onAddShape,
   onUpdateShape,
-  onSelectShape,
+  onSelect,
+  onReorder,
+  dropTargetId,
+  setDropTargetId,
 }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const interactionRef = useRef<Interaction | null>(null)
@@ -53,101 +95,197 @@ export function Canvas({
     resetViewport(containerRef.current)
   }, [resetViewport])
 
-  const getCanvasPoint = (event: ReactPointerEvent<HTMLElement>): Point => {
-    const bounds = event.currentTarget.getBoundingClientRect()
-    return screenToCanvas(
-      { x: event.clientX - bounds.left, y: event.clientY - bounds.top },
-      viewport,
-    )
+  const toCanvas = (clientX: number, clientY: number) => {
+    const bounds = containerRef.current?.getBoundingClientRect()
+    const originX = bounds ? bounds.left : 0
+    const originY = bounds ? bounds.top : 0
+    return screenToCanvas({ x: clientX - originX, y: clientY - originY }, viewport)
   }
 
-  const startDrawing = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || isSpacePressed || activeTool === 'select') return
+  const selectedEntry = flat.find((item) => item.node.id === selectedId)
+  const selectedNode = selectedEntry?.node ?? null
 
+  const parentOfNode = (nodeId: string): string | null => {
+    const entry = flat.find((item) => item.node.id === nodeId)
+    return entry?.parentId ?? null
+  }
+
+  const startDraw = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || isSpacePressed || activeTool === 'select') return
     event.preventDefault()
-    const start = getCanvasPoint(event)
-    const palette = SHAPE_PALETTE[activeTool]
+
+    const point = toCanvas(event.clientX, event.clientY)
+    const tool = activeTool as ShapeType
+    const parentId = frameUnderPoint(point)
+
+    if (tool === 'text') {
+      const created = createShape('text', point.x, point.y, DEFAULT_TEXT_SIZE.width, DEFAULT_TEXT_SIZE.height)
+      if (parentId) {
+        const parent = flat.find((item) => item.node.id === parentId)
+        if (parent) {
+          created.x = point.x - parent.worldX
+          created.y = point.y - parent.worldY
+        }
+      }
+      onAddShape(created, parentId)
+      return
+    }
 
     interactionRef.current = {
       kind: 'draw',
-      tool: activeTool,
-      start,
+      tool,
+      start: point,
+      current: point,
+      equalSides: false,
+      pointerId: event.pointerId,
+      parentId,
+    }
+    const base = createShape(tool, point.x, point.y, 0, 0)
+    const palette = SHAPE_PALETTE[tool]
+    setGhost({ ...base, fill: palette.fill, stroke: palette.stroke })
+  }
+
+  const startMove = (
+    event: ReactPointerEvent<HTMLDivElement>,
+    node: ShapeModel,
+  ) => {
+    if (event.button !== 0 || isSpacePressed || activeTool !== 'select') return
+    event.preventDefault()
+    event.stopPropagation()
+
+    const parentId = parentOfNode(node.id)
+    const point = toCanvas(event.clientX, event.clientY)
+    const parent = parentId ? flat.find((item) => item.node.id === parentId) : undefined
+
+    interactionRef.current = {
+      kind: 'move',
+      nodeId: node.id,
+      parentId,
+      startCanvas: point,
+      origin: {
+        x: parent ? point.x - parent.worldX : point.x,
+        y: parent ? point.y - parent.worldY : point.y,
+      },
       pointerId: event.pointerId,
     }
-    setGhost({
-      id: 'ghost',
-      name: `New ${activeTool}`,
-      type: activeTool,
-      x: start.x,
-      y: start.y,
-      width: 0,
-      height: 0,
-      fill: palette.fill,
-      stroke: palette.stroke,
-      strokeWidth: 1,
-      rotation: 0,
+
+    onSelect(node.id)
+    onUpdateShape(node.id, {
+      x: parent ? node.x : point.x,
+      y: parent ? node.y : point.y,
     })
   }
 
-  const startMoving = (event: ReactPointerEvent<HTMLButtonElement>, shape: ShapeModel) => {
-    if (event.button !== 0 || isSpacePressed || activeTool !== 'select') return
-
+  const startResize = (event: ReactPointerEvent<HTMLButtonElement>, handle: Handle) => {
+    if (!selectedNode) return
     event.preventDefault()
-    onSelectShape(shape.id)
+    event.stopPropagation()
+
     interactionRef.current = {
-      kind: 'move',
-      shapeId: shape.id,
-      start: { x: event.clientX, y: event.clientY },
-      origin: { x: shape.x, y: shape.y },
+      kind: 'resize',
+      nodeId: selectedNode.id,
+      handle,
+      startCanvas: toCanvas(event.clientX, event.clientY),
+      origin: {
+        x: selectedNode.x,
+        y: selectedNode.y,
+        width: selectedNode.width,
+        height: selectedNode.height,
+      },
       pointerId: event.pointerId,
     }
+  }
+
+  const frameUnderPoint = (point: { x: number; y: number }): string | null => {
+    for (let index = flat.length - 1; index >= 0; index -= 1) {
+      const item = flat[index]
+      if (item.node.type !== 'frame' || !item.node.visible || item.node.locked) continue
+      const inside =
+        point.x >= item.worldX &&
+        point.x <= item.worldX + item.worldWidth &&
+        point.y >= item.worldY &&
+        point.y <= item.worldY + item.worldHeight
+      if (inside) return item.node.id
+    }
+    return null
   }
 
   const updateInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {
     const interaction = interactionRef.current
     if (!interaction || interaction.pointerId !== event.pointerId) return
 
+    const point = toCanvas(event.clientX, event.clientY)
+
     if (interaction.kind === 'draw') {
-      const rect = rectFromPoints(
-        interaction.start,
-        getCanvasPoint(event),
-        event.shiftKey,
+      interaction.current = point
+      interaction.equalSides = event.shiftKey
+      const rect = rectFromPoints(interaction.start, point, event.shiftKey)
+      const parent = interaction.parentId
+        ? flat.find((item) => item.node.id === interaction.parentId)
+        : undefined
+      const localX = parent ? rect.x - parent.worldX : rect.x
+      const localY = parent ? rect.y - parent.worldY : rect.y
+      setGhost((current) =>
+        current ? { ...current, x: localX, y: localY, width: rect.width, height: rect.height } : current,
       )
-      setGhost((current) => (current ? { ...current, ...rect } : current))
       return
     }
 
-    onUpdateShape(interaction.shapeId, {
-      x: interaction.origin.x + (event.clientX - interaction.start.x) / viewport.zoom,
-      y: interaction.origin.y + (event.clientY - interaction.start.y) / viewport.zoom,
-    })
+    if (interaction.kind === 'move') {
+      const parent = interaction.parentId
+        ? flat.find((item) => item.node.id === interaction.parentId)
+        : undefined
+      const baseX = parent ? interaction.startCanvas.x - parent.worldX : interaction.startCanvas.x
+      const baseY = parent ? interaction.startCanvas.y - parent.worldY : interaction.startCanvas.y
+      onUpdateShape(interaction.nodeId, {
+        x: baseX + (point.x - interaction.startCanvas.x),
+        y: baseY + (point.y - interaction.startCanvas.y),
+      })
+      return
+    }
+
+    const dx = point.x - interaction.startCanvas.x
+    const dy = point.y - interaction.startCanvas.y
+    const next = resizeRect(interaction, dx, dy, event.shiftKey)
+    onUpdateShape(interaction.nodeId, next)
   }
 
   const finishInteraction = () => {
     const interaction = interactionRef.current
     if (!interaction) return
 
-    if (interaction.kind === 'draw' && ghost) {
-      const isClick = ghost.width < 3 && ghost.height < 3
-      const rect = isClick
-        ? { x: ghost.x, y: ghost.y, width: DEFAULT_SHAPE_SIZE, height: DEFAULT_SHAPE_SIZE }
-        : ghost
-      const count = shapes.filter((shape) => shape.type === interaction.tool).length + 1
+    if (interaction.kind === 'draw') {
+      const rect = rectFromPoints(interaction.start, interaction.current, interaction.equalSides)
+      const isClick = rect.width < 3 && rect.height < 3
+      const defaults =
+        interaction.tool === 'frame' ? DEFAULT_FRAME_SIZE : { width: DEFAULT_DRAG_SIZE, height: DEFAULT_DRAG_SIZE }
+      const parent = interaction.parentId
+        ? flat.find((item) => item.node.id === interaction.parentId)
+        : undefined
 
-      onAddShape({
-        ...ghost,
-        id: crypto.randomUUID(),
-        name: `${interaction.tool === 'rectangle' ? 'Rectangle' : 'Ellipse'} ${count}`,
-        ...rect,
-      })
+      const size = isClick
+        ? { width: defaults.width, height: defaults.height }
+        : { width: rect.width, height: rect.height }
+      const x = isClick && parent ? 0 : parent ? rect.x - parent.worldX : rect.x
+      const y = isClick && parent ? 0 : parent ? rect.y - parent.worldY : rect.y
+
+      const created = createShape(interaction.tool, x, y, size.width, size.height)
+      onAddShape(created, interaction.parentId)
     }
 
     interactionRef.current = null
     setGhost(null)
   }
 
+  const handleDropOnFrame = (frameId: string) => {
+    const dragId = selectedId
+    setDropTargetId(null)
+    if (!dragId || dragId === frameId) return
+    onReorder(dragId, frameId)
+  }
+
   return (
-    <main className="relative h-dvh w-screen overflow-hidden bg-[#0b0c10] text-[#f4f2ff]">
+    <main className="relative h-dvh w-screen overflow-hidden bg-[#0a0c11] text-[#f2f4fb]">
       <div
         ref={containerRef}
         className={`absolute inset-0 overflow-hidden ${
@@ -158,11 +296,8 @@ export function Canvas({
             handlePointerDown(event)
             return
           }
-
-          if (event.target === event.currentTarget && activeTool === 'select') {
-            onSelectShape(null)
-          }
-          startDrawing(event)
+          if (event.target === event.currentTarget) onSelect(null)
+          startDraw(event)
         }}
         onPointerMove={(event) => {
           handlePointerMove(event)
@@ -199,19 +334,28 @@ export function Canvas({
             <Shape
               key={shape.id}
               shape={shape}
-              isSelected={shape.id === selectedShapeId}
-              onSelect={() => onSelectShape(shape.id)}
-              onMoveStart={(event) => startMoving(event, shape)}
+              depth={0}
+              isSelected={shape.id === selectedId}
+              isDropTarget={dropTargetId === shape.id}
+              onSelect={(event) => startMove(event, shape)}
+              onPointerDownFrame={(event, frame) => startMove(event, frame)}
+              onDropOnFrame={handleDropOnFrame}
             />
           ))}
-          {ghost ? (
-            <Shape
-              shape={ghost}
-              isSelected={false}
-              isGhost
-              onSelect={() => undefined}
+
+          {selectedEntry && selectedNode && selectedNode.visible ? (
+            <SelectionBox
+              x={selectedEntry.worldX}
+              y={selectedEntry.worldY}
+              width={selectedEntry.worldWidth}
+              height={selectedEntry.worldHeight}
+              zoom={viewport.zoom}
+              isFrame={selectedNode.type === 'frame'}
+              onHandlePointerDown={startResize}
             />
           ) : null}
+
+          {ghost ? <Shape shape={ghost} depth={0} isSelected={false} isGhost onSelect={() => undefined} /> : null}
         </div>
       </div>
 
@@ -221,8 +365,6 @@ export function Canvas({
             type="button"
             onClick={() => resetViewport(containerRef.current)}
             className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold tracking-wide text-[#9c98b5] transition hover:bg-white/8 hover:text-white"
-            aria-label="Reset viewport"
-            title="Reset viewport (center at 100%)"
           >
             Fit
           </button>
@@ -230,8 +372,116 @@ export function Canvas({
           <span className="min-w-11 px-2 text-right text-[11px] font-semibold tabular-nums text-[#b9b4d1]">
             {zoomPercentage}%
           </span>
+          <span className="h-4 w-px bg-white/10" />
+          <span className="px-2 text-[10px] font-medium text-[#6f6d82]">
+            {TOOL_LABEL[activeTool] ?? DEFAULT_TOOL}
+          </span>
         </div>
       </div>
     </main>
   )
+}
+
+const TOOL_LABEL: Record<Tool, string> = {
+  select: 'Move',
+  rectangle: 'Rectangle',
+  ellipse: 'Ellipse',
+  frame: 'Frame',
+  text: 'Text',
+}
+
+interface SelectionBoxProps {
+  x: number
+  y: number
+  width: number
+  height: number
+  zoom: number
+  isFrame: boolean
+  onHandlePointerDown: (event: ReactPointerEvent<HTMLButtonElement>, handle: Handle) => void
+}
+
+function SelectionBox({ x, y, width, height, zoom, isFrame, onHandlePointerDown }: SelectionBoxProps) {
+  const size = HANDLE_SIZE / zoom
+  const offset = -size / 2
+  const handles: Handle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']
+
+  return (
+    <div
+      className="pointer-events-none absolute"
+      style={{ left: x, top: y, width, height, outline: `${1 / zoom}px solid #8290ee` }}
+    >
+      {handles.map((handle) => {
+        const horizontal = handle.includes('e') ? 1 : handle.includes('w') ? 0 : null
+        const vertical = handle.includes('s') ? 1 : handle.includes('n') ? 0 : null
+        const left = horizontal === null ? '50%' : horizontal === 1 ? '100%' : '0%'
+        const top = vertical === null ? '50%' : vertical === 1 ? '100%' : '0%'
+
+        return (
+          <button
+            key={handle}
+            type="button"
+            aria-label={`Resize ${handle}`}
+            onPointerDown={(event) => onHandlePointerDown(event, handle)}
+            className={`pointer-events-auto absolute rounded-[2px] border border-[#0a0c11] ${
+              isFrame && (handle === 'n' || handle === 's' || handle === 'w' || handle === 'e')
+                ? 'hidden'
+                : ''
+            }`}
+            style={{
+              width: size,
+              height: size,
+              left: `calc(${left}% + ${offset}px)`,
+              top: `calc(${top}% + ${offset}px)`,
+              transform: 'translate(-50%, -50%)',
+              background: '#f2f4fb',
+              cursor: CURSORS[handle],
+            }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
+function resizeRect(
+  interaction: Extract<Interaction, { kind: 'resize' }>,
+  dx: number,
+  dy: number,
+  keepAspect: boolean,
+): Partial<ShapeModel> {
+  const { origin, handle } = interaction
+  const minSize = 4
+
+  let { x, y, width, height } = origin
+
+  if (handle.includes('e')) width = Math.max(minSize, origin.width + dx)
+  if (handle.includes('s')) height = Math.max(minSize, origin.height + dy)
+  if (handle.includes('w')) {
+    width = Math.max(minSize, origin.width - dx)
+    x = origin.x + (origin.width - width)
+  }
+  if (handle.includes('n')) {
+    height = Math.max(minSize, origin.height - dy)
+    y = origin.y + (origin.height - height)
+  }
+
+  if (keepAspect && origin.width > 0 && origin.height > 0) {
+    const ratio = origin.width / origin.height
+    if (handle === 'n' || handle === 's') {
+      height = Math.max(minSize, origin.height + dy)
+      width = Math.max(minSize, height * ratio)
+    } else {
+      width = Math.max(minSize, origin.width + dx)
+      height = Math.max(minSize, width / ratio)
+    }
+    if (handle.includes('w')) x = origin.x + (origin.width - width)
+    if (handle.includes('n')) y = origin.y + (origin.height - height)
+  }
+
+  return {
+    x,
+    y,
+    width: clamp(width, minSize, 100000),
+    height: clamp(height, minSize, 100000),
+  }
 }

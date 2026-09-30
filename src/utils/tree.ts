@@ -1,0 +1,144 @@
+import { DEFAULT_AUTO_LAYOUT, createShape } from '../constants/tools'
+import type { Point, Shape } from '../types/shape'
+
+interface FlatNode {
+  node: Shape
+  parentId: string | null
+  depth: number
+  worldX: number
+  worldY: number
+  worldWidth: number
+  worldHeight: number
+}
+
+export function flattenTree(shapes: Shape[], parentId: string | null = null, depth = 0, offsetX = 0, offsetY = 0): FlatNode[] {
+  const result: FlatNode[] = []
+
+  for (const node of shapes) {
+    const worldX = offsetX + node.x
+    const worldY = offsetY + node.y
+    result.push({
+      node,
+      parentId,
+      depth,
+      worldX,
+      worldY,
+      worldWidth: node.width,
+      worldHeight: node.height,
+    })
+    result.push(...flattenTree(node.children, node.id, depth + 1, worldX, worldY))
+  }
+
+  return result
+}
+
+export function findNode(shapes: Shape[], id: string): Shape | null {
+  for (const node of shapes) {
+    if (node.id === id) return node
+    const found = findNode(node.children, id)
+    if (found) return found
+  }
+  return null
+}
+
+export function findParentId(shapes: Shape[], id: string, parentId: string | null = null): string | null {
+  for (const node of shapes) {
+    if (node.id === id) return parentId
+    const found = findParentId(node.children, id, node.id)
+    if (found !== null || node.children.some((child) => child.id === id)) return found
+  }
+  return null
+}
+
+export function isDescendant(shapes: Shape[], ancestorId: string, candidateId: string): boolean {
+  const ancestor = findNode(shapes, ancestorId)
+  if (!ancestor) return false
+  return findNode(ancestor.children, candidateId) !== null
+}
+
+export function updateNodeInTree(shapes: Shape[], id: string, updates: Partial<Shape>): Shape[] {
+  return shapes.map((node) => {
+    if (node.id === id) return { ...node, ...updates }
+    if (node.children.length === 0) return node
+    return { ...node, children: updateNodeInTree(node.children, id, updates) }
+  })
+}
+
+export function removeNodeFromTree(shapes: Shape[], id: string): Shape[] {
+  return shapes
+    .filter((node) => node.id !== id)
+    .map((node) =>
+      node.children.length === 0 ? node : { ...node, children: removeNodeFromTree(node.children, id) },
+    )
+}
+
+export function insertNodeIntoTree(
+  shapes: Shape[],
+  parentId: string | null,
+  node: Shape,
+  index?: number,
+): Shape[] {
+  if (parentId === null) {
+    const next = [...shapes]
+    next.splice(index ?? next.length, 0, node)
+    return next
+  }
+  return shapes.map((shape) => {
+    if (shape.id === parentId) {
+      const children = [...shape.children]
+      children.splice(index ?? children.length, 0, node)
+      return { ...shape, children }
+    }
+    return { ...shape, children: insertNodeIntoTree(shape.children, parentId, node, index) }
+  })
+}
+
+export function appendChild(shapes: Shape[], parentId: string, child: Shape): Shape[] {
+  return shapes.map((node) => {
+    if (node.id === parentId) return { ...node, children: [...node.children, child] }
+    return { ...node, children: appendChild(node.children, parentId, child) }
+  })
+}
+
+export function worldRectOf(node: FlatNode): { x: number; y: number; width: number; height: number } {
+  return { x: node.worldX, y: node.worldY, width: node.worldWidth, height: node.worldHeight }
+}
+
+export function absoluteOffset(shapes: Shape[], id: string): Point {
+  const entry = flattenTree(shapes).find((item) => item.node.id === id)
+  return entry ? { x: entry.worldX, y: entry.worldY } : { x: 0, y: 0 }
+}
+
+export function moveNodeTo(shapes: Shape[], id: string, targetParentId: string | null, targetIndex: number): Shape[] {
+  const node = findNode(shapes, id)
+  if (!node) return shapes
+  if (targetParentId === id || (targetParentId && isDescendant(shapes, id, targetParentId))) return shapes
+
+  const entry = flattenTree(shapes).find((item) => item.node.id === id)
+  const parentOffset = targetParentId ? absoluteOffset(shapes, targetParentId) : { x: 0, y: 0 }
+  const detached = removeNodeFromTree(shapes, id)
+  const positioned: Shape = {
+    ...node,
+    x: (entry?.worldX ?? node.x) - parentOffset.x,
+    y: (entry?.worldY ?? node.y) - parentOffset.y,
+  }
+  return insertNodeIntoTree(detached, targetParentId, positioned, targetIndex)
+}
+
+export function nextSiblingName(shapes: Shape[], type: Shape['type']): string {
+  const count = flattenTree(shapes).filter((item) => item.node.type === type).length + 1
+  const base = type === 'rectangle' ? 'Rectangle' : type === 'ellipse' ? 'Ellipse' : type === 'frame' ? 'Frame' : 'Text'
+  return `${base} ${count}`
+}
+
+export function uniqueName(shapes: Shape[], type: Shape['type']): string {
+  return nextSiblingName(shapes, type)
+}
+
+export function createNodeAt(type: Shape['type'], point: Point, width: number, height: number): Shape {
+  return createShape(type, point.x, point.y, width, height)
+}
+
+export function frameDefaults(): typeof DEFAULT_AUTO_LAYOUT {
+  return { ...DEFAULT_AUTO_LAYOUT }
+}
