@@ -89,14 +89,54 @@ export function PropertiesPanel({ shape, onUpdate, onDuplicate, onDelete }: Prop
         <div className="flex items-center gap-2">
           <input
             type="color"
-            value={shape.type === 'frame' ? '#0a0c11' : shape.fill}
+            value={shape.type === 'frame' || shape.fill === 'transparent' ? '#0a0c11' : shape.fill}
             onChange={(event) => set({ fill: event.target.value })}
             className="size-7 cursor-pointer rounded border border-white/10 bg-transparent"
             aria-label="Fill color"
           />
-          <span className="text-[11px] uppercase text-[#8b8aa3]">{shape.fill}</span>
+          {shape.type === 'vector' ? (
+            <button
+              type="button"
+              onClick={() => set({ fill: shape.fill === 'transparent' ? '#4a5bc4' : 'transparent' })}
+              className="rounded-md border border-white/10 px-2 py-1 text-[10px] font-medium text-[#9a98ad] transition hover:bg-white/6"
+            >
+              {shape.fill === 'transparent' ? 'Fill: off' : 'Fill: on'}
+            </button>
+          ) : (
+            <span className="text-[11px] uppercase text-[#8b8aa3]">{shape.fill}</span>
+          )}
         </div>
       </Field>
+
+      {shape.type === 'vector' ? (
+        <>
+          <Field label="Stroke">
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={shape.stroke}
+                onChange={(event) => set({ stroke: event.target.value })}
+                className="size-7 cursor-pointer rounded border border-white/10 bg-transparent"
+                aria-label="Stroke color"
+              />
+              <span className="text-[11px] uppercase text-[#8b8aa3]">{shape.stroke}</span>
+            </div>
+          </Field>
+          <NumberField
+            label="Stroke width"
+            value={shape.strokeWidth}
+            min={1}
+            onChange={(value) => set({ strokeWidth: value })}
+          />
+          <button
+            type="button"
+            onClick={() => set({ vector: { ...shape.vector, closed: !shape.vector.closed } })}
+            className="mt-3 w-full rounded-lg border border-white/10 px-2 py-1.5 text-[11px] font-medium text-[#b9b4d1] transition hover:bg-white/6"
+          >
+            {shape.vector.closed ? 'Open path' : 'Close path'} · {shape.vector.vertices.length} points
+          </button>
+        </>
+      ) : null}
 
       {shape.type === 'rectangle' ? (
         <NumberField

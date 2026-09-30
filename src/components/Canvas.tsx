@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import { DEFAULT_FRAME_SIZE, DEFAULT_TOOL, SHAPE_PALETTE, createShape } from '../constants/tools'
 import { useViewport } from '../hooks/useViewport'
-import type { Shape as ShapeModel, ShapeType, Tool } from '../types/shape'
+import type { Shape as ShapeModel, ShapeType, Tool, VectorVertex } from '../types/shape'
 import { clamp, rectFromPoints, screenToCanvas } from '../utils/geometry'
+import { buildPathData, normalizeVertices } from '../utils/vector'
 import { Shape } from './Shape'
 
 const GRID_SIZE = 20
@@ -63,6 +64,7 @@ type Interaction =
       origin: { x: number; y: number; width: number; height: number }
       pointerId: number
     }
+  | { kind: 'pen'; pointerId: number; anchor: { x: number; y: number } }
 
 export function Canvas({
   shapes,
@@ -79,6 +81,8 @@ export function Canvas({
   const containerRef = useRef<HTMLDivElement>(null)
   const interactionRef = useRef<Interaction | null>(null)
   const [ghost, setGhost] = useState<ShapeModel | null>(null)
+  const [pathVertices, setPathVertices] = useState<VectorVertex[]>([])
+  const [pathCursor, setPathCursor] = useState<{ x: number; y: number } | null>(null)
   const {
     viewport,
     isPanning,
@@ -94,6 +98,110 @@ export function Canvas({
   useEffect(() => {
     resetViewport(containerRef.current)
   }, [resetViewport])
+
+  useEffect(() => {
+    if (activeTool !== 'vector') {
+      setPathVertices([])
+      setPathCursor(null)
+    }
+  }, [activeTool])
+
+  const finishPathRef = useRef<() => void>(() => undefined)
+  finishPathRef.current = () => finishPath(false)
+
+  useEffect(() => {
+    const handle = () => finishPathRef.current()
+    window.addEventListener('opencode:finish-path', handle)
+    return () => window.removeEventListener('opencode:finish-path', handle)
+  }, [])
+
+  const finishPath = useCallback(
+    (closed: boolean) => {
+      if (pathVertices.length === 0) return
+
+      const usable = closed && pathVertices.length > 2 ? pathVertices : pathVertices
+      const parentId = frameUnderPoint(usable[0])
+      const parent = parentId ? flat.find((item) => item.node.id === parentId) : undefined
+
+      const originX = parent ? parent.worldX : 0
+      const originY = parent ? parent.worldY : 0
+      const local = usable.map((vertex) => ({ ...vertex, x: vertex.x - originX, y: vertex.y - originY }))
+      const { vertices, x, y } = normalizeVertices(local)
+
+      const created = createShape('vector', x, y, 1, 1)
+      created.vector = { vertices, closed }
+      created.width = Math.max(
+        vertices.reduce((max, vertex) => Math.max(max, vertex.x), 0),
+        1,
+      )
+      created.height = Math.max(
+        vertices.reduce((max, vertex) => Math.max(max, vertex.y), 0),
+        1,
+      )
+      created.strokeWidth = 2
+
+      onAddShape(created, parentId)
+      setPathVertices([])
+      setPathCursor(null)
+    },
+    // frameUnderPoint читает актуальные flat/shapes из замыкания
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pathVertices, flat, onAddShape],
+  )
+
+  const onPenPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (activeTool !== 'vector' || event.button !== 0 || isSpacePressed) return
+    event.preventDefault()
+
+    const point = toCanvas(event.clientX, event.clientY)
+
+    if (event.shiftKey && pathVertices.length >= 3) {
+      const first = pathVertices[0]
+      if (Math.hypot(first.x - point.x, first.y - point.y) <= 10 / viewport.zoom) {
+        finishPath(true)
+        return
+      }
+    }
+
+    if (event.altKey || event.metaKey) {
+      if (pathVertices.length > 0) finishPath(false)
+      return
+    }
+
+    interactionRef.current = {
+      kind: 'pen',
+      pointerId: event.pointerId,
+      anchor: point,
+    }
+    setPathVertices((current) => [
+      ...current,
+      { x: point.x, y: point.y, inX: 0, inY: 0, outX: 0, outY: 0 },
+    ])
+  }
+
+  const onPenPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (activeTool !== 'vector') return
+    const point = toCanvas(event.clientX, event.clientY)
+    setPathCursor(point)
+
+    const interaction = interactionRef.current
+    if (!interaction || interaction.kind !== 'pen' || interaction.pointerId !== event.pointerId) return
+
+    const outX = point.x - interaction.anchor.x
+    const outY = point.y - interaction.anchor.y
+
+    setPathVertices((current) => {
+      if (current.length === 0) return current
+      const next = [...current]
+      const last = next[next.length - 1]
+      next[next.length - 1] = { ...last, outX, outY, inX: -outX, inY: -outY }
+      return next
+    })
+  }
+
+  const onPenPointerUp = () => {
+    if (interactionRef.current?.kind === 'pen') interactionRef.current = null
+  }
 
   const toCanvas = (clientX: number, clientY: number) => {
     const bounds = containerRef.current?.getBoundingClientRect()
@@ -244,6 +352,8 @@ export function Canvas({
       return
     }
 
+    if (interaction.kind !== 'resize') return
+
     const dx = point.x - interaction.startCanvas.x
     const dy = point.y - interaction.startCanvas.y
     const next = resizeRect(interaction, dx, dy, event.shiftKey)
@@ -296,20 +406,39 @@ export function Canvas({
             handlePointerDown(event)
             return
           }
+          if (activeTool === 'vector') {
+            onPenPointerDown(event)
+            return
+          }
           if (event.target === event.currentTarget) onSelect(null)
           startDraw(event)
         }}
         onPointerMove={(event) => {
           handlePointerMove(event)
+          if (activeTool === 'vector') {
+            onPenPointerMove(event)
+            return
+          }
           updateInteraction(event)
         }}
         onPointerUp={(event) => {
           handlePointerUp(event)
+          if (activeTool === 'vector') {
+            onPenPointerUp()
+            return
+          }
           finishInteraction()
         }}
         onPointerCancel={(event) => {
           handlePointerUp(event)
+          if (activeTool === 'vector') {
+            onPenPointerUp()
+            return
+          }
           finishInteraction()
+        }}
+        onDoubleClick={() => {
+          if (activeTool === 'vector') finishPath(false)
         }}
         onWheel={handleWheel}
         aria-label="Design canvas"
@@ -355,6 +484,10 @@ export function Canvas({
             />
           ) : null}
 
+          {pathVertices.length > 0 ? (
+            <PenPreview vertices={pathVertices} cursor={pathCursor} closed={false} zoom={viewport.zoom} />
+          ) : null}
+
           {ghost ? <Shape shape={ghost} depth={0} isSelected={false} isGhost onSelect={() => undefined} /> : null}
         </div>
       </div>
@@ -388,6 +521,76 @@ const TOOL_LABEL: Record<Tool, string> = {
   ellipse: 'Ellipse',
   frame: 'Frame',
   text: 'Text',
+  vector: 'Pen',
+}
+
+interface PenPreviewProps {
+  vertices: VectorVertex[]
+  cursor: { x: number; y: number } | null
+  closed: boolean
+  zoom: number
+}
+
+function PenPreview({ vertices, cursor, zoom }: PenPreviewProps) {
+  if (vertices.length === 0) return null
+
+  const withCursor: VectorVertex[] = cursor
+    ? [
+        ...vertices,
+        { x: cursor.x, y: cursor.y, inX: 0, inY: 0, outX: 0, outY: 0 },
+      ]
+    : vertices
+
+  const xs = withCursor.map((vertex) => vertex.x)
+  const ys = withCursor.map((vertex) => vertex.y)
+  const minX = Math.min(...xs) - 20
+  const minY = Math.min(...ys) - 20
+  const width = Math.max(Math.max(...xs) - minX + 20, 40)
+  const height = Math.max(Math.max(...ys) - minY + 20, 40)
+
+  return (
+    <svg
+      className="pointer-events-none absolute overflow-visible"
+      style={{ left: minX, top: minY, width, height }}
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      <path
+        d={buildPathData(
+          withCursor.map((vertex) => ({ ...vertex, x: vertex.x - minX, y: vertex.y - minY })),
+          false,
+        )}
+        fill="none"
+        stroke="#8290ee"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      {vertices.map((vertex, index) => {
+        const cx = vertex.x - minX
+        const cy = vertex.y - minY
+        const isFirst = index === 0
+        return (
+          <g key={index}>
+            {vertex.outX !== 0 || vertex.outY !== 0 ? (
+              <>
+                <line x1={cx} y1={cy} x2={cx + vertex.outX} y2={cy + vertex.outY} stroke="#5b6bd8" strokeWidth={1 / zoom} />
+                <circle cx={cx + vertex.outX} cy={cy + vertex.outY} r={3 / zoom} fill="#5b6bd8" />
+                <line x1={cx} y1={cy} x2={cx + vertex.inX} y2={cy + vertex.inY} stroke="#5b6bd8" strokeWidth={1 / zoom} />
+                <circle cx={cx + vertex.inX} cy={cy + vertex.inY} r={3 / zoom} fill="#5b6bd8" />
+              </>
+            ) : null}
+            <circle
+              cx={cx}
+              cy={cy}
+              r={4 / zoom}
+              fill={isFirst ? '#f2f4fb' : '#5b6bd8'}
+              stroke="#0a0c11"
+              strokeWidth={1 / zoom}
+            />
+          </g>
+        )
+      })}
+    </svg>
+  )
 }
 
 interface SelectionBoxProps {

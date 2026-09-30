@@ -1,4 +1,11 @@
-import type { AutoLayout, Shape, ShapeType, TextProps, Tool } from '../types/shape'
+import type {
+  AutoLayout,
+  Shape,
+  ShapeType,
+  TextProps,
+  Tool,
+  VectorProps,
+} from '../types/shape'
 
 export const DEFAULT_TOOL = 'select'
 
@@ -8,6 +15,7 @@ export const TOOL_KEY_BINDINGS: Record<Tool, string> = {
   ellipse: 'O',
   frame: 'F',
   text: 'T',
+  vector: 'P',
 }
 
 export const TOOLS: ReadonlyArray<{
@@ -20,6 +28,7 @@ export const TOOLS: ReadonlyArray<{
   { id: 'rectangle', label: 'Rectangle', shortcut: TOOL_KEY_BINDINGS.rectangle },
   { id: 'ellipse', label: 'Ellipse', shortcut: TOOL_KEY_BINDINGS.ellipse },
   { id: 'text', label: 'Text', shortcut: TOOL_KEY_BINDINGS.text },
+  { id: 'vector', label: 'Pen', shortcut: TOOL_KEY_BINDINGS.vector },
 ]
 
 export const ACCENT = '#5b6bd8'
@@ -29,6 +38,7 @@ export const SHAPE_PALETTE: Record<ShapeType, { fill: string; stroke: string }> 
   ellipse: { fill: '#1a6f80', stroke: '#3fc4d4' },
   frame: { fill: 'transparent', stroke: '#5a5d72' },
   text: { fill: '#f2f4fb', stroke: 'transparent' },
+  vector: { fill: 'transparent', stroke: '#8290ee' },
 }
 
 export const DEFAULT_FRAME_SIZE = { width: 480, height: 320 }
@@ -42,6 +52,11 @@ export const DEFAULT_AUTO_LAYOUT: AutoLayout = {
   paddingLeft: 24,
   alignItems: 'start',
   justifyContent: 'start',
+}
+
+export const DEFAULT_VECTOR: VectorProps = {
+  vertices: [],
+  closed: false,
 }
 
 export const DEFAULT_TEXT: TextProps = {
@@ -64,7 +79,15 @@ export function createShape(type: ShapeType, x: number, y: number, width: number
 
   return {
     id: `${type}-${Date.now().toString(36)}-${idCounter}`,
-    name: isFrame ? 'Frame' : isText ? 'Text' : type === 'rectangle' ? 'Rectangle' : 'Ellipse',
+    name: isFrame
+      ? 'Frame'
+      : isText
+        ? 'Text'
+        : type === 'rectangle'
+          ? 'Rectangle'
+          : type === 'vector'
+            ? 'Path'
+            : 'Ellipse',
     type,
     x,
     y,
@@ -80,6 +103,7 @@ export function createShape(type: ShapeType, x: number, y: number, width: number
     locked: false,
     autoLayout: isFrame ? { ...DEFAULT_AUTO_LAYOUT, mode: 'vertical' } : { ...DEFAULT_AUTO_LAYOUT },
     text: { ...DEFAULT_TEXT },
+    vector: { ...DEFAULT_VECTOR, vertices: [] },
     children: [],
   }
 }

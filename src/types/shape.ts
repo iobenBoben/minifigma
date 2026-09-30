@@ -1,4 +1,4 @@
-export type ShapeType = 'rectangle' | 'ellipse' | 'frame' | 'text'
+export type ShapeType = 'rectangle' | 'ellipse' | 'frame' | 'text' | 'vector'
 
 export type Tool = 'select' | ShapeType
 
@@ -43,6 +43,21 @@ export interface TextProps {
   textAlign: TextAlign
 }
 
+/** Anchor point of a bezier segment. `in`/`out` are control offsets in node space. */
+export interface VectorVertex {
+  x: number
+  y: number
+  inX: number
+  inY: number
+  outX: number
+  outY: number
+}
+
+export interface VectorProps {
+  vertices: VectorVertex[]
+  closed: boolean
+}
+
 export interface Shape {
   id: string
   name: string
@@ -61,5 +76,6 @@ export interface Shape {
   locked: boolean
   autoLayout: AutoLayout
   text: TextProps
+  vector: VectorProps
   children: Shape[]
 }

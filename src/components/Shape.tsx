@@ -1,6 +1,7 @@
 import { memo } from 'react'
 
 import type { Shape as ShapeModel } from '../types/shape'
+import { buildPathData } from '../utils/vector'
 
 interface ShapeProps {
   shape: ShapeModel
@@ -83,6 +84,7 @@ function ShapeImpl({
 
   const isEllipse = shape.type === 'ellipse'
   const isText = shape.type === 'text'
+  const isVector = shape.type === 'vector'
 
   return (
     <div
@@ -91,14 +93,43 @@ function ShapeImpl({
       }`}
       style={{
         ...baseStyle,
-        backgroundColor: isText ? 'transparent' : shape.fill,
-        border: shape.strokeWidth > 0 ? `${shape.strokeWidth}px solid ${shape.stroke}` : undefined,
+        backgroundColor: isText || isVector ? 'transparent' : shape.fill,
+        border: !isVector && shape.strokeWidth > 0 ? `${shape.strokeWidth}px solid ${shape.stroke}` : undefined,
         borderRadius: isEllipse ? '9999px' : shape.radius,
       }}
       onPointerDown={(event) => onSelect(event)}
       data-node={shape.id}
       data-depth={depth}
     >
+      {isVector ? (
+        <svg
+          className="h-full w-full overflow-visible"
+          viewBox={`0 0 ${shape.width} ${shape.height}`}
+          preserveAspectRatio="none"
+        >
+          <path
+            d={buildPathData(shape.vector.vertices, shape.vector.closed)}
+            fill={shape.fill === 'transparent' ? 'none' : shape.fill}
+            stroke={shape.stroke}
+            strokeWidth={shape.strokeWidth}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          {isSelected && !isGhost
+            ? shape.vector.vertices.map((vertex, index) => (
+                <circle
+                  key={index}
+                  cx={vertex.x}
+                  cy={vertex.y}
+                  r={3}
+                  fill="#f2f4fb"
+                  stroke="#0a0c11"
+                  strokeWidth={1}
+                />
+              ))
+            : null}
+        </svg>
+      ) : null}
       {isText ? (
         <div
           className="h-full w-full whitespace-pre-wrap break-words"

@@ -12,6 +12,7 @@ const TOOL_ICON_PATHS: Record<Tool, string> = {
   ellipse: 'M20 12c0 3.59-3.58 6.5-8 6.5S4 15.59 4 12s3.58-6.5 8-6.5 8 2.91 8 6.5Z',
   frame: 'M7 3v18M17 3v18M3 7h18M3 17h18',
   text: 'M5 6.5V4.5h14v2M12 4.5v15M8.5 19.5h7',
+  vector: 'M4 19 19 4M19 4h-5M19 4v5M19 19H4M4 19v-5',
 }
 
 export function Toolbar({ activeTool, onToolChange }: ToolbarProps) {
