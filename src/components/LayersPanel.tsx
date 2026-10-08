@@ -1,6 +1,14 @@
 import { useState } from 'react'
 
 import type { Shape } from '../types/shape'
+import { findNode, findParentId, isDescendant, siblingIndex } from '../utils/tree'
+
+export type DropMode = 'before' | 'after' | 'inside'
+
+interface DropState {
+  rowId: string
+  mode: DropMode
+}
 
 interface LayersPanelProps {
   shapes: Shape[]
@@ -21,9 +29,22 @@ export function LayersPanel({
 }: LayersPanelProps) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dropLineId, setDropLineId] = useState<string | null>(null)
+  const [dropState, setDropState] = useState<DropState | null>(null)
 
   const count = countNodes(shapes)
+
+  const clearDrag = () => {
+    setDraggingId(null)
+    setDropState(null)
+  }
+
+  const applyDrop = (rowId: string, mode: DropMode) => {
+    if (draggingId && draggingId !== rowId) {
+      const target = resolveDropTarget(shapes, draggingId, rowId, mode)
+      if (target) onReorder(draggingId, target.parentId, target.index)
+    }
+    clearDrag()
+  }
 
   return (
     <section className="flex min-h-0 flex-1 flex-col px-2 py-3">
@@ -57,18 +78,11 @@ export function LayersPanel({
               onToggleVisibility={onToggleVisibility}
               onToggleLock={onToggleLock}
               draggingId={draggingId}
-              dropLineId={dropLineId}
+              dropState={dropState}
               onDragStart={setDraggingId}
-              onDragEnd={() => {
-                setDraggingId(null)
-                setDropLineId(null)
-              }}
-              onDropLine={setDropLineId}
-              onDrop={(id, parentId) => {
-                if (draggingId && draggingId !== id) onReorder(draggingId, parentId)
-                setDraggingId(null)
-                setDropLineId(null)
-              }}
+              onDragEnd={clearDrag}
+              onDragOverRow={(rowId, mode) => setDropState({ rowId, mode })}
+              onDropRow={applyDrop}
             />
           ))}
         </ul>
@@ -83,15 +97,15 @@ interface LayerRowProps {
   selectedId: string | null
   collapsed: Record<string, boolean>
   draggingId: string | null
-  dropLineId: string | null
+  dropState: DropState | null
   onToggleCollapse: (id: string) => void
   onSelect: (id: string) => void
   onToggleVisibility: (id: string) => void
   onToggleLock: (id: string) => void
   onDragStart: (id: string) => void
   onDragEnd: () => void
-  onDropLine: (id: string | null) => void
-  onDrop: (id: string, parentId: string | null) => void
+  onDragOverRow: (rowId: string, mode: DropMode) => void
+  onDropRow: (rowId: string, mode: DropMode) => void
 }
 
 function LayerRow({
@@ -100,19 +114,19 @@ function LayerRow({
   selectedId,
   collapsed,
   draggingId,
-  dropLineId,
+  dropState,
   onToggleCollapse,
   onSelect,
   onToggleVisibility,
   onToggleLock,
   onDragStart,
   onDragEnd,
-  onDropLine,
-  onDrop,
+  onDragOverRow,
+  onDropRow,
 }: LayerRowProps) {
   const isContainer = shape.children.length > 0
   const isCollapsed = Boolean(collapsed[shape.id])
-  const isDropLine = dropLineId === shape.id
+  const dropMode = dropState && dropState.rowId === shape.id ? dropState.mode : null
 
   return (
     <li>
@@ -123,25 +137,27 @@ function LayerRow({
         onDragOver={(event) => {
           event.preventDefault()
           event.stopPropagation()
-          onDropLine(shape.id)
+          onDragOverRow(shape.id, dropModeFromEvent(event, isContainer))
         }}
         onDrop={(event) => {
           event.preventDefault()
           event.stopPropagation()
-          onDrop(shape.id, null)
+          if (dropMode) onDropRow(shape.id, dropMode)
         }}
         onClick={() => onSelect(shape.id)}
-        onDragEnter={(event) => {
-          if (shape.type === 'frame' && draggingId && draggingId !== shape.id) {
-            event.stopPropagation()
-            onDrop(shape.id, shape.id)
-          }
-        }}
         className={`group flex cursor-pointer items-center gap-1 rounded-lg py-1.5 pr-2 text-left text-[11px] transition ${
           selectedId === shape.id
             ? 'bg-[#5b6bd8]/18 text-[#c2c8f5]'
             : 'text-[#8b8aa3] hover:bg-white/6 hover:text-[#e7e4f5]'
-        } ${isDropLine ? 'border-t border-[#5b6bd8]' : ''}`}
+        } ${
+          dropMode === 'before'
+            ? 'border-t-2 border-[#5b6bd8]'
+            : dropMode === 'after'
+              ? 'border-b-2 border-[#5b6bd8]'
+              : dropMode === 'inside'
+                ? 'bg-[#5b6bd8]/25 ring-1 ring-inset ring-[#5b6bd8]'
+                : ''
+        }`}
         style={{ paddingLeft: 8 + depth * 14 }}
       >
         <button
@@ -209,21 +225,65 @@ function LayerRow({
               selectedId={selectedId}
               collapsed={collapsed}
               draggingId={draggingId}
-              dropLineId={dropLineId}
+              dropState={dropState}
               onToggleCollapse={onToggleCollapse}
               onSelect={onSelect}
               onToggleVisibility={onToggleVisibility}
               onToggleLock={onToggleLock}
               onDragStart={onDragStart}
               onDragEnd={onDragEnd}
-              onDropLine={onDropLine}
-              onDrop={onDrop}
+              onDragOverRow={onDragOverRow}
+              onDropRow={onDropRow}
             />
           ))}
         </ul>
       ) : null}
     </li>
   )
+}
+
+/**
+ * Верхняя и нижняя четверти строки — вставка рядом, середина контейнера — внутрь.
+ * Для строки без детей середина делит пополам, чтобы «до» и «после» были равнозначны.
+ */
+function dropModeFromEvent(event: React.DragEvent<HTMLDivElement>, isContainer: boolean): DropMode {
+  const bounds = event.currentTarget.getBoundingClientRect()
+  if (bounds.height === 0) return 'after'
+
+  const ratio = (event.clientY - bounds.top) / bounds.height
+  if (isContainer) {
+    if (ratio < 0.25) return 'before'
+    if (ratio > 0.75) return 'after'
+    return 'inside'
+  }
+  return ratio < 0.5 ? 'before' : 'after'
+}
+
+interface DropTarget {
+  parentId: string | null
+  index: number
+}
+
+function resolveDropTarget(
+  shapes: Shape[],
+  dragId: string,
+  rowId: string,
+  mode: DropMode,
+): DropTarget | null {
+  if (mode === 'inside') {
+    const row = findNode(shapes, rowId)
+    if (!row || row.type !== 'frame') return null
+    if (isDescendant(shapes, dragId, row.id)) return null
+    return { parentId: row.id, index: row.children.length }
+  }
+
+  const parentId = findParentId(shapes, rowId)
+  const rowIndex = siblingIndex(shapes, rowId)
+  if (rowIndex === -1) return null
+  if (parentId !== null && (parentId === dragId || isDescendant(shapes, dragId, parentId))) {
+    return null
+  }
+  return { parentId, index: mode === 'before' ? rowIndex : rowIndex + 1 }
 }
 
 function countNodes(shapes: Shape[]): number {

@@ -104,6 +104,16 @@ export function absoluteOffset(shapes: Shape[], id: string): Point {
   return entry ? { x: entry.worldX, y: entry.worldY } : { x: 0, y: 0 }
 }
 
+/** Порядковый номер узла среди соседей, либо -1, если узла в дереве нет. */
+export function siblingIndex(shapes: Shape[], id: string): number {
+  for (const node of shapes) {
+    if (node.id === id) return shapes.indexOf(node)
+    const nested = siblingIndex(node.children, id)
+    if (nested !== -1) return nested
+  }
+  return -1
+}
+
 export function moveNodeTo(shapes: Shape[], id: string, targetParentId: string | null, targetIndex: number): Shape[] {
   const node = findNode(shapes, id)
   if (!node) return shapes
@@ -112,12 +122,18 @@ export function moveNodeTo(shapes: Shape[], id: string, targetParentId: string |
   const entry = flattenTree(shapes).find((item) => item.node.id === id)
   const parentOffset = targetParentId ? absoluteOffset(shapes, targetParentId) : { x: 0, y: 0 }
   const detached = removeNodeFromTree(shapes, id)
+
+  // Узел изымается до вставки, поэтому вставка ниже него в том же родителе сдвигается на один.
+  const currentIndex = siblingIndex(shapes, id)
+  const sameParent = (entry?.parentId ?? null) === targetParentId
+  const index = sameParent && currentIndex !== -1 && targetIndex > currentIndex ? targetIndex - 1 : targetIndex
+
   const positioned: Shape = {
     ...node,
     x: (entry?.worldX ?? node.x) - parentOffset.x,
     y: (entry?.worldY ?? node.y) - parentOffset.y,
   }
-  return insertNodeIntoTree(detached, targetParentId, positioned, targetIndex)
+  return insertNodeIntoTree(detached, targetParentId, positioned, index)
 }
 
 export function isLockedInTree(shapes: Shape[], id: string): boolean {
