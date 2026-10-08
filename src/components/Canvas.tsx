@@ -5,7 +5,7 @@ import { DEFAULT_FRAME_SIZE, DEFAULT_TOOL, SHAPE_PALETTE, createShape } from '..
 import { useViewport } from '../hooks/useViewport'
 import type { Point, Shape as ShapeModel, ShapeType, Tool, VectorVertex } from '../types/shape'
 import { clamp, rectFromPoints, screenToCanvas } from '../utils/geometry'
-import { isLockedInTree } from '../utils/tree'
+import { isLockedInTree, findNode } from '../utils/tree'
 import { buildPathData, normalizeVertices } from '../utils/vector'
 import { Shape } from './Shape'
 
@@ -77,6 +77,11 @@ export function Canvas({
 }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const interactionRef = useRef<Interaction | null>(null)
+  const shapesRef = useRef(shapes)
+
+  useEffect(() => {
+    shapesRef.current = shapes
+  }, [shapes])
   const [ghost, setGhost] = useState<ShapeModel | null>(null)
   const [rawPathVertices, setPathVertices] = useState<VectorVertex[]>([])
   const [rawPathCursor, setPathCursor] = useState<{ x: number; y: number } | null>(null)
@@ -99,6 +104,16 @@ export function Canvas({
   const isPenTool = activeTool === 'vector'
   const pathVertices = isPenTool ? rawPathVertices : EMPTY_VERTICES
   const pathCursor = isPenTool ? rawPathCursor : null
+
+  /** Высота текстового узла выводится из содержимого, поэтому приходит снизу. */
+  const handleAutoHeight = useCallback(
+    (id: string, height: number) => {
+      const node = findNode(shapesRef.current, id)
+      if (!node || node.height === height) return
+      onUpdateShape(id, { height })
+    },
+    [onUpdateShape],
+  )
 
   const frameUnderPoint = useCallback(
     (point: Point): string | null => {
@@ -451,6 +466,7 @@ export function Canvas({
               key={shape.id}
               shape={shape}
               selectedId={selectedId}
+              onAutoHeight={handleAutoHeight}
               onSelect={(event) => startMove(event, shape)}
             />
           ))}

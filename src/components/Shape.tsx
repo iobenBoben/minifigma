@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
 
 import type { Shape as ShapeModel } from '../types/shape'
 import { buildPathData } from '../utils/vector'
@@ -7,10 +7,11 @@ interface ShapeProps {
   shape: ShapeModel
   selectedId: string | null
   isGhost?: boolean
+  onAutoHeight?: (id: string, height: number) => void
   onSelect: (event: React.PointerEvent<HTMLDivElement>) => void
 }
 
-function ShapeImpl({ shape, selectedId, isGhost = false, onSelect }: ShapeProps) {
+function ShapeImpl({ shape, selectedId, isGhost = false, onAutoHeight, onSelect }: ShapeProps) {
   if (!shape.visible && !isGhost) return null
 
   const isSelected = shape.id === selectedId
@@ -41,6 +42,7 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onSelect }: ShapeProps)
             key={child.id}
             shape={child}
             selectedId={selectedId}
+            onAutoHeight={onAutoHeight}
             onSelect={onSelect}
           />
         ))}
@@ -96,21 +98,61 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onSelect }: ShapeProps)
         </svg>
       ) : null}
       {isText ? (
-        <div
-          className="h-full w-full whitespace-pre-wrap break-words"
-          style={{
-            color: shape.fill,
-            fontFamily: `${shape.text.fontFamily}, system-ui, sans-serif`,
-            fontSize: shape.text.fontSize,
-            fontWeight: fontWeightOf(shape.text.fontStyle),
-            letterSpacing: shape.text.letterSpacing,
-            lineHeight: `${shape.text.lineHeight}px`,
-            textAlign: shape.text.textAlign.toLowerCase() as 'left' | 'center' | 'right',
-          }}
-        >
-          {shape.text.content}
-        </div>
+        <MeasuredText
+          shape={shape}
+          disabled={Boolean(isGhost)}
+          onAutoHeight={onAutoHeight}
+        />
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * Текстовый узел не хранит свою высоту: она выводится из содержимого,
+ * иначе длинная строка выходит за границу фигуры.
+ */
+function MeasuredText({
+  shape,
+  disabled,
+  onAutoHeight,
+}: {
+  shape: ShapeModel
+  disabled: boolean
+  onAutoHeight?: (id: string, height: number) => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const element = ref.current
+    if (!element || disabled || !onAutoHeight) return
+
+    const report = () => {
+      const needed = Math.ceil(element.scrollHeight)
+      if (needed > 0 && needed !== element.clientHeight) onAutoHeight(shape.id, needed)
+    }
+
+    report()
+    const observer = new ResizeObserver(report)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [shape.id, shape.text, disabled, onAutoHeight])
+
+  return (
+    <div
+      ref={ref}
+      className="h-full w-full overflow-hidden whitespace-pre-wrap break-words"
+      style={{
+        color: shape.fill,
+        fontFamily: `${shape.text.fontFamily}, system-ui, sans-serif`,
+        fontSize: shape.text.fontSize,
+        fontWeight: fontWeightOf(shape.text.fontStyle),
+        letterSpacing: shape.text.letterSpacing,
+        lineHeight: `${shape.text.lineHeight}px`,
+        textAlign: shape.text.textAlign.toLowerCase() as 'left' | 'center' | 'right',
+      }}
+    >
+      {shape.text.content}
     </div>
   )
 }
