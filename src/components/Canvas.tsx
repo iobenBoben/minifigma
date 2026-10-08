@@ -33,9 +33,6 @@ interface CanvasProps {
   onAddShape: (shape: ShapeModel, parentId?: string | null) => void
   onUpdateShape: (id: string, updates: Partial<ShapeModel>) => void
   onSelect: (id: string | null) => void
-  onReorder: (id: string, parentId: string | null, index?: number) => void
-  dropTargetId: string | null
-  setDropTargetId: (id: string | null) => void
 }
 
 type Interaction =
@@ -74,9 +71,6 @@ export function Canvas({
   onAddShape,
   onUpdateShape,
   onSelect,
-  onReorder,
-  dropTargetId,
-  setDropTargetId,
 }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const interactionRef = useRef<Interaction | null>(null)
@@ -387,13 +381,6 @@ export function Canvas({
     setGhost(null)
   }
 
-  const handleDropOnFrame = (frameId: string) => {
-    const dragId = selectedId
-    setDropTargetId(null)
-    if (!dragId || dragId === frameId) return
-    onReorder(dragId, frameId)
-  }
-
   return (
     <main className="relative h-dvh w-screen overflow-hidden bg-[#0a0c11] text-[#f2f4fb]">
       <div
@@ -463,12 +450,8 @@ export function Canvas({
             <Shape
               key={shape.id}
               shape={shape}
-              depth={0}
-              isSelected={shape.id === selectedId}
-              isDropTarget={dropTargetId === shape.id}
+              selectedId={selectedId}
               onSelect={(event) => startMove(event, shape)}
-              onPointerDownFrame={(event, frame) => startMove(event, frame)}
-              onDropOnFrame={handleDropOnFrame}
             />
           ))}
 
@@ -485,10 +468,10 @@ export function Canvas({
           ) : null}
 
           {pathVertices.length > 0 ? (
-            <PenPreview vertices={pathVertices} cursor={pathCursor} closed={false} zoom={viewport.zoom} />
+            <PenPreview vertices={pathVertices} cursor={pathCursor} zoom={viewport.zoom} />
           ) : null}
 
-          {ghost ? <Shape shape={ghost} depth={0} isSelected={false} isGhost onSelect={() => undefined} /> : null}
+          {ghost ? <Shape shape={ghost} selectedId={null} isGhost onSelect={() => undefined} /> : null}
         </div>
       </div>
 
@@ -527,7 +510,6 @@ const TOOL_LABEL: Record<Tool, string> = {
 interface PenPreviewProps {
   vertices: VectorVertex[]
   cursor: { x: number; y: number } | null
-  closed: boolean
   zoom: number
 }
 

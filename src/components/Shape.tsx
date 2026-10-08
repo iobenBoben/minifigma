@@ -5,29 +5,15 @@ import { buildPathData } from '../utils/vector'
 
 interface ShapeProps {
   shape: ShapeModel
-  depth: number
-  isSelected: boolean
+  selectedId: string | null
   isGhost?: boolean
-  isDropTarget?: boolean
   onSelect: (event: React.PointerEvent<HTMLDivElement>) => void
-  onPointerDownChild?: (event: React.PointerEvent<HTMLDivElement>, child: ShapeModel) => void
-  onPointerDownFrame?: (event: React.PointerEvent<HTMLDivElement>, frame: ShapeModel) => void
-  onDropOnFrame?: (frameId: string) => void
 }
 
-function ShapeImpl({
-  shape,
-  depth,
-  isSelected,
-  isGhost = false,
-  isDropTarget = false,
-  onSelect,
-  onPointerDownChild,
-  onPointerDownFrame,
-  onDropOnFrame,
-}: ShapeProps) {
+function ShapeImpl({ shape, selectedId, isGhost = false, onSelect }: ShapeProps) {
   if (!shape.visible && !isGhost) return null
 
+  const isSelected = shape.id === selectedId
   const baseStyle: React.CSSProperties = {
     left: shape.x,
     top: shape.y,
@@ -42,40 +28,20 @@ function ShapeImpl({
       <div
         className="absolute"
         style={baseStyle}
-        onPointerDown={(event) => onPointerDownFrame?.(event, shape)}
-        onDragOver={(event) => {
-          if (isGhost) return
-          event.preventDefault()
-          event.stopPropagation()
-        }}
-        onDrop={(event) => {
-          if (isGhost) return
-          event.preventDefault()
-          event.stopPropagation()
-          onDropOnFrame?.(shape.id)
-        }}
+        onPointerDown={(event) => onSelect(event)}
         data-frame={shape.id}
-        data-depth={depth}
       >
         <div
           className={`pointer-events-none absolute inset-0 rounded-[2px] border ${
-            isDropTarget ? 'border-[#5b6bd8] bg-[#5b6bd8]/12' : 'border-white/22'
+            isSelected ? 'border-[#8290ee]' : 'border-white/22'
           }`}
         />
-        {isSelected && !isGhost ? (
-          <div className="pointer-events-none absolute -inset-px rounded-[2px] ring-2 ring-[#8290ee]" />
-        ) : null}
-        {shape.autoLayout.mode === 'none' ? null : null}
         {shape.children.map((child) => (
           <ShapeImpl
             key={child.id}
             shape={child}
-            depth={depth + 1}
-            isSelected={false}
-            onSelect={() => undefined}
-            onPointerDownChild={onPointerDownChild}
-            onPointerDownFrame={onPointerDownFrame}
-            onDropOnFrame={onDropOnFrame}
+            selectedId={selectedId}
+            onSelect={onSelect}
           />
         ))}
       </div>
@@ -88,7 +54,7 @@ function ShapeImpl({
 
   return (
     <div
-      className={`absolute ${isGhost ? '' : 'pointer-events-auto'} ${
+      className={`absolute ${
         isSelected && !isGhost ? 'ring-2 ring-[#8290ee]' : ''
       }`}
       style={{
@@ -99,7 +65,6 @@ function ShapeImpl({
       }}
       onPointerDown={(event) => onSelect(event)}
       data-node={shape.id}
-      data-depth={depth}
     >
       {isVector ? (
         <svg

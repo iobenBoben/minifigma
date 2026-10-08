@@ -11,7 +11,6 @@ import type { Tool } from './types/shape'
 
 export default function App() {
   const [activeTool, setActiveTool] = useState<Tool>(DEFAULT_TOOL)
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null)
   const {
     shapes,
     flat,
@@ -56,9 +55,6 @@ export default function App() {
         onAddShape={addShape}
         onUpdateShape={updateShape}
         onSelect={select}
-        onReorder={reorderShape}
-        dropTargetId={dropTargetId}
-        setDropTargetId={setDropTargetId}
       />
       <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
 
