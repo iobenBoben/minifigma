@@ -280,10 +280,18 @@ export function Canvas({
       onSelect(node.id)
       return
     }
+
+    // В auto-layout фрейме позиция ребёнка задаётся раскладкой, ручное перетаскивание бессмысленно.
+    const parentId = parentOfNode(node.id)
+    const parentNode = parentId ? findNode(shapes, parentId) : null
+    if (parentNode && parentNode.autoLayout.mode !== 'none') {
+      onSelect(node.id)
+      return
+    }
+
     event.preventDefault()
     event.stopPropagation()
 
-    const parentId = parentOfNode(node.id)
     const point = toCanvas(event.clientX, event.clientY)
     const parent = parentId ? flat.find((item) => item.node.id === parentId) : undefined
 
