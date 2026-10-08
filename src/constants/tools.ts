@@ -31,8 +31,6 @@ export const TOOLS: ReadonlyArray<{
   { id: 'vector', label: 'Pen', shortcut: TOOL_KEY_BINDINGS.vector },
 ]
 
-export const ACCENT = '#5b6bd8'
-
 export const SHAPE_PALETTE: Record<ShapeType, { fill: string; stroke: string }> = {
   rectangle: { fill: '#4a5bc4', stroke: '#8290ee' },
   ellipse: { fill: '#1a6f80', stroke: '#3fc4d4' },
@@ -69,9 +67,17 @@ export const DEFAULT_TEXT: TextProps = {
   textAlign: 'LEFT',
 }
 
+const DEFAULT_STROKE_WIDTH = 1
+
 let idCounter = 0
 
-export function createShape(type: ShapeType, x: number, y: number, width: number, height: number): Shape {
+export function createShape(
+  type: ShapeType,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): Shape {
   idCounter += 1
   const palette = SHAPE_PALETTE[type]
   const isFrame = type === 'frame'
@@ -95,7 +101,7 @@ export function createShape(type: ShapeType, x: number, y: number, width: number
     height,
     fill: palette.fill,
     stroke: palette.stroke,
-    strokeWidth: isFrame ? 1 : 1,
+    strokeWidth: DEFAULT_STROKE_WIDTH,
     radius: type === 'rectangle' ? 4 : 0,
     rotation: 0,
     opacity: 100,

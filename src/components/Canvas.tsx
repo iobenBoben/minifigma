@@ -3,7 +3,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import { DEFAULT_FRAME_SIZE, DEFAULT_TOOL, SHAPE_PALETTE, createShape } from '../constants/tools'
 import { useViewport } from '../hooks/useViewport'
-import type { Shape as ShapeModel, ShapeType, Tool, VectorVertex } from '../types/shape'
+import type { Point, Shape as ShapeModel, ShapeType, Tool, VectorVertex } from '../types/shape'
 import { clamp, rectFromPoints, screenToCanvas } from '../utils/geometry'
 import { isLockedInTree } from '../utils/tree'
 import { buildPathData, normalizeVertices } from '../utils/vector'
@@ -25,6 +25,8 @@ const CURSORS = {
 } as const
 
 type Handle = keyof typeof CURSORS
+
+const EMPTY_VERTICES: VectorVertex[] = []
 
 interface CanvasProps {
   shapes: ShapeModel[]
@@ -76,8 +78,8 @@ export function Canvas({
   const containerRef = useRef<HTMLDivElement>(null)
   const interactionRef = useRef<Interaction | null>(null)
   const [ghost, setGhost] = useState<ShapeModel | null>(null)
-  const [pathVertices, setPathVertices] = useState<VectorVertex[]>([])
-  const [pathCursor, setPathCursor] = useState<{ x: number; y: number } | null>(null)
+  const [rawPathVertices, setPathVertices] = useState<VectorVertex[]>([])
+  const [rawPathCursor, setPathCursor] = useState<{ x: number; y: number } | null>(null)
   const {
     viewport,
     isPanning,
@@ -94,33 +96,41 @@ export function Canvas({
     resetViewport(containerRef.current)
   }, [resetViewport])
 
-  useEffect(() => {
-    if (activeTool !== 'vector') {
-      setPathVertices([])
-      setPathCursor(null)
-    }
-  }, [activeTool])
+  const isPenTool = activeTool === 'vector'
+  const pathVertices = isPenTool ? rawPathVertices : EMPTY_VERTICES
+  const pathCursor = isPenTool ? rawPathCursor : null
 
-  const finishPathRef = useRef<() => void>(() => undefined)
-  finishPathRef.current = () => finishPath(false)
-
-  useEffect(() => {
-    const handle = () => finishPathRef.current()
-    window.addEventListener('opencode:finish-path', handle)
-    return () => window.removeEventListener('opencode:finish-path', handle)
-  }, [])
+  const frameUnderPoint = useCallback(
+    (point: Point): string | null => {
+      for (let index = flat.length - 1; index >= 0; index -= 1) {
+        const item = flat[index]
+        if (item.node.type !== 'frame' || !item.node.visible || item.node.locked) continue
+        const inside =
+          point.x >= item.worldX &&
+          point.x <= item.worldX + item.worldWidth &&
+          point.y >= item.worldY &&
+          point.y <= item.worldY + item.worldHeight
+        if (inside) return item.node.id
+      }
+      return null
+    },
+    [flat],
+  )
 
   const finishPath = useCallback(
     (closed: boolean) => {
       if (pathVertices.length === 0) return
 
-      const usable = closed && pathVertices.length > 2 ? pathVertices : pathVertices
-      const parentId = frameUnderPoint(usable[0])
+      const parentId = frameUnderPoint(pathVertices[0])
       const parent = parentId ? flat.find((item) => item.node.id === parentId) : undefined
 
       const originX = parent ? parent.worldX : 0
       const originY = parent ? parent.worldY : 0
-      const local = usable.map((vertex) => ({ ...vertex, x: vertex.x - originX, y: vertex.y - originY }))
+      const local = pathVertices.map((vertex) => ({
+        ...vertex,
+        x: vertex.x - originX,
+        y: vertex.y - originY,
+      }))
       const { vertices, x, y } = normalizeVertices(local)
 
       const created = createShape('vector', x, y, 1, 1)
@@ -139,9 +149,7 @@ export function Canvas({
       setPathVertices([])
       setPathCursor(null)
     },
-    // frameUnderPoint читает актуальные flat/shapes из замыкания
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [pathVertices, flat, onAddShape],
+    [pathVertices, flat, onAddShape, frameUnderPoint],
   )
 
   const onPenPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -302,20 +310,6 @@ export function Canvas({
       },
       pointerId: event.pointerId,
     }
-  }
-
-  const frameUnderPoint = (point: { x: number; y: number }): string | null => {
-    for (let index = flat.length - 1; index >= 0; index -= 1) {
-      const item = flat[index]
-      if (item.node.type !== 'frame' || !item.node.visible || item.node.locked) continue
-      const inside =
-        point.x >= item.worldX &&
-        point.x <= item.worldX + item.worldWidth &&
-        point.y >= item.worldY &&
-        point.y <= item.worldY + item.worldHeight
-      if (inside) return item.node.id
-    }
-    return null
   }
 
   const updateInteraction = (event: ReactPointerEvent<HTMLDivElement>) => {

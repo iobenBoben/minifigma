@@ -43,11 +43,10 @@ export function LayersPanel({
         </div>
       ) : (
         <ul className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
-          {shapes.map((shape, index) => (
+          {shapes.map((shape) => (
             <LayerRow
               key={shape.id}
               shape={shape}
-              index={index}
               depth={0}
               selectedId={selectedId}
               collapsed={collapsed}
@@ -80,7 +79,6 @@ export function LayersPanel({
 
 interface LayerRowProps {
   shape: Shape
-  index: number
   depth: number
   selectedId: string | null
   collapsed: Record<string, boolean>
@@ -98,7 +96,6 @@ interface LayerRowProps {
 
 function LayerRow({
   shape,
-  index,
   depth,
   selectedId,
   collapsed,
@@ -202,13 +199,12 @@ function LayerRow({
         </button>
       </div>
 
-      {!isCollapsed && shape.children.length > 0 ? (
+      {shape.children.length > 0 && !isCollapsed ? (
         <ul className="space-y-0.5">
-          {shape.children.map((child, childIndex) => (
+          {shape.children.map((child) => (
             <LayerRow
               key={child.id}
               shape={child}
-              index={childIndex}
               depth={depth + 1}
               selectedId={selectedId}
               collapsed={collapsed}
@@ -226,8 +222,6 @@ function LayerRow({
           ))}
         </ul>
       ) : null}
-
-      {index >= 0 ? null : null}
     </li>
   )
 }
