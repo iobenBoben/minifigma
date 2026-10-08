@@ -158,10 +158,24 @@ function loadShapes(): Shape[] {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as Shape[]) : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(isShapeNode)
   } catch {
     return []
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function isShapeNode(value: unknown): value is Shape {
+  if (!isRecord(value)) return false
+  if (typeof value.id !== 'string' || typeof value.type !== 'string') return false
+  if (typeof value.x !== 'number' || typeof value.y !== 'number') return false
+  if (typeof value.width !== 'number' || typeof value.height !== 'number') return false
+  if (!Array.isArray(value.children)) return false
+  return value.children.every(isShapeNode)
 }
 
 function saveShapes(shapes: Shape[]): void {
