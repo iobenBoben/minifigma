@@ -7,13 +7,6 @@ export function screenToCanvas(point: Point, transform: { pan: Point; zoom: numb
   }
 }
 
-export function canvasToScreen(point: Point, transform: { pan: Point; zoom: number }): Point {
-  return {
-    x: point.x * transform.zoom + transform.pan.x,
-    y: point.y * transform.zoom + transform.pan.y,
-  }
-}
-
 export function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(Math.max(value, minimum), maximum)
 }
@@ -36,11 +29,3 @@ export function rectFromPoints(start: Point, end: Point, equalSides = false): Re
   }
 }
 
-export function pointInRect(point: Point, rect: Rect): boolean {
-  return (
-    point.x >= rect.x &&
-    point.x <= rect.x + rect.width &&
-    point.y >= rect.y &&
-    point.y <= rect.y + rect.height
-  )
-}
