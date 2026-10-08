@@ -8,6 +8,11 @@ dist
 dist-ssr
 *.local
 
+# Secrets
+.env
+.env.*
+!.env.example
+
 # Agent tooling installed by the skills CLI
 .agents/
 
