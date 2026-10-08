@@ -121,10 +121,10 @@ export function Canvas({
         const item = flat[index]
         if (item.node.type !== 'frame' || !item.node.visible || item.node.locked) continue
         const inside =
-          point.x >= item.worldX &&
-          point.x <= item.worldX + item.worldWidth &&
-          point.y >= item.worldY &&
-          point.y <= item.worldY + item.worldHeight
+          point.x >= item.boundsX &&
+          point.x <= item.boundsX + item.boundsWidth &&
+          point.y >= item.boundsY &&
+          point.y <= item.boundsY + item.boundsHeight
         if (inside) return item.node.id
       }
       return null
@@ -476,10 +476,10 @@ export function Canvas({
           selectedNode.visible &&
           !isLockedInTree(shapes, selectedNode.id) ? (
             <SelectionBox
-              x={selectedEntry.worldX}
-              y={selectedEntry.worldY}
-              width={selectedEntry.worldWidth}
-              height={selectedEntry.worldHeight}
+              x={selectedEntry.boundsX}
+              y={selectedEntry.boundsY}
+              width={selectedEntry.boundsWidth}
+              height={selectedEntry.boundsHeight}
               zoom={viewport.zoom}
               isFrame={selectedNode.type === 'frame'}
               onHandlePointerDown={startResize}

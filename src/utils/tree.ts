@@ -4,10 +4,16 @@ interface FlatNode {
   node: Shape
   parentId: string | null
   depth: number
+  /** Положение узла в системе координат холста без учёта поворота: от него считаются координаты потомков. */
   worldX: number
   worldY: number
   worldWidth: number
   worldHeight: number
+  /** Габариты с учётом поворота: по ним определяется попадание курсора и рисуется рамка выделения. */
+  boundsX: number
+  boundsY: number
+  boundsWidth: number
+  boundsHeight: number
 }
 
 export function flattenTree(shapes: Shape[], parentId: string | null = null, depth = 0, offsetX = 0, offsetY = 0): FlatNode[] {
@@ -16,6 +22,12 @@ export function flattenTree(shapes: Shape[], parentId: string | null = null, dep
   for (const node of shapes) {
     const worldX = offsetX + node.x
     const worldY = offsetY + node.y
+    const angle = (node.rotation * Math.PI) / 180
+    const cos = Math.abs(Math.cos(angle))
+    const sin = Math.abs(Math.sin(angle))
+    const boundsWidth = node.width * cos + node.height * sin
+    const boundsHeight = node.width * sin + node.height * cos
+
     result.push({
       node,
       parentId,
@@ -24,6 +36,10 @@ export function flattenTree(shapes: Shape[], parentId: string | null = null, dep
       worldY,
       worldWidth: node.width,
       worldHeight: node.height,
+      boundsX: worldX + (node.width - boundsWidth) / 2,
+      boundsY: worldY + (node.height - boundsHeight) / 2,
+      boundsWidth,
+      boundsHeight,
     })
     result.push(...flattenTree(node.children, node.id, depth + 1, worldX, worldY))
   }
