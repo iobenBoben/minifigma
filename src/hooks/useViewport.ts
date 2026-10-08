@@ -33,7 +33,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
   )
 }
 
-export function useViewport(): ViewportControls {
+export function useViewport(containerRef?: React.RefObject<HTMLElement | null>): ViewportControls {
   const [viewport, setViewport] = useState<ViewportState>({ pan: { x: 0, y: 0 }, zoom: 1 })
   const [isPanning, setIsPanning] = useState(false)
   const [spacePressed, setSpacePressed] = useState(false)
@@ -85,19 +85,29 @@ export function useViewport(): ViewportControls {
   }, [])
 
   useEffect(() => {
+    const container = containerRef?.current
+    if (!container) return
+
+    let previousWidth = container.clientWidth
+    let previousHeight = container.clientHeight
+
     const handleResize = () => {
+      const nextWidth = container.clientWidth
+      const nextHeight = container.clientHeight
+      const deltaX = (nextWidth - previousWidth) / 2
+      const deltaY = (nextHeight - previousHeight) / 2
+      previousWidth = nextWidth
+      previousHeight = nextHeight
+
       setViewport((current) => ({
         ...current,
-        pan: {
-          x: Math.max(current.pan.x, window.innerWidth / 2),
-          y: Math.max(current.pan.y, window.innerHeight / 2),
-        },
+        pan: { x: current.pan.x + deltaX, y: current.pan.y + deltaY },
       }))
     }
 
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [])
+  }, [containerRef])
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLElement>) => {

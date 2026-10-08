@@ -5,6 +5,7 @@ import { DEFAULT_FRAME_SIZE, DEFAULT_TOOL, SHAPE_PALETTE, createShape } from '..
 import { useViewport } from '../hooks/useViewport'
 import type { Shape as ShapeModel, ShapeType, Tool, VectorVertex } from '../types/shape'
 import { clamp, rectFromPoints, screenToCanvas } from '../utils/geometry'
+import { isLockedInTree } from '../utils/tree'
 import { buildPathData, normalizeVertices } from '../utils/vector'
 import { Shape } from './Shape'
 
@@ -87,7 +88,7 @@ export function Canvas({
     handlePointerUp,
     handleWheel,
     resetViewport,
-  } = useViewport()
+  } = useViewport(containerRef)
 
   useEffect(() => {
     resetViewport(containerRef.current)
@@ -252,6 +253,10 @@ export function Canvas({
     node: ShapeModel,
   ) => {
     if (event.button !== 0 || isSpacePressed || activeTool !== 'select') return
+    if (isLockedInTree(shapes, node.id)) {
+      onSelect(node.id)
+      return
+    }
     event.preventDefault()
     event.stopPropagation()
 
@@ -280,6 +285,7 @@ export function Canvas({
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>, handle: Handle) => {
     if (!selectedNode) return
+    if (isLockedInTree(shapes, selectedNode.id)) return
     event.preventDefault()
     event.stopPropagation()
 
@@ -455,7 +461,10 @@ export function Canvas({
             />
           ))}
 
-          {selectedEntry && selectedNode && selectedNode.visible ? (
+          {selectedEntry &&
+          selectedNode &&
+          selectedNode.visible &&
+          !isLockedInTree(shapes, selectedNode.id) ? (
             <SelectionBox
               x={selectedEntry.worldX}
               y={selectedEntry.worldY}
