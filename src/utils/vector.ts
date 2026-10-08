@@ -1,4 +1,4 @@
-import type { Shape, VectorVertex } from '../types/shape'
+import type { VectorVertex } from '../types/shape'
 
 const HANDLE_EPSILON = 0.5
 
@@ -84,24 +84,3 @@ function round(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-/** Recomputes the node box from its vertices after a move or an edit. */
-export function reflowVector(shape: Shape): Shape {
-  if (shape.type !== 'vector' || shape.vector.vertices.length === 0) return shape
-  const dims = vectorDimensions(shape.vector.vertices)
-  return { ...shape, width: dims.width, height: dims.height }
-}
-
-export function vertexIndexAt(vertices: VectorVertex[], x: number, y: number, radius: number): number | null {
-  let closest: number | null = null
-  let closestDistance = radius
-
-  vertices.forEach((vertex, index) => {
-    const distance = Math.hypot(vertex.x - x, vertex.y - y)
-    if (distance <= closestDistance) {
-      closest = index
-      closestDistance = distance
-    }
-  })
-
-  return closest
-}

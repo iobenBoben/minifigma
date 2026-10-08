@@ -1,4 +1,3 @@
-import { DEFAULT_AUTO_LAYOUT, createShape } from '../constants/tools'
 import type { Point, Shape } from '../types/shape'
 
 interface FlatNode {
@@ -45,7 +44,7 @@ export function findParentId(shapes: Shape[], id: string, parentId: string | nul
   for (const node of shapes) {
     if (node.id === id) return parentId
     const found = findParentId(node.children, id, node.id)
-    if (found !== null || node.children.some((child) => child.id === id)) return found
+    if (found !== null) return found
   }
   return null
 }
@@ -100,10 +99,6 @@ export function appendChild(shapes: Shape[], parentId: string, child: Shape): Sh
   })
 }
 
-export function worldRectOf(node: FlatNode): { x: number; y: number; width: number; height: number } {
-  return { x: node.worldX, y: node.worldY, width: node.worldWidth, height: node.worldHeight }
-}
-
 export function absoluteOffset(shapes: Shape[], id: string): Point {
   const entry = flattenTree(shapes).find((item) => item.node.id === id)
   return entry ? { x: entry.worldX, y: entry.worldY } : { x: 0, y: 0 }
@@ -125,20 +120,19 @@ export function moveNodeTo(shapes: Shape[], id: string, targetParentId: string |
   return insertNodeIntoTree(detached, targetParentId, positioned, targetIndex)
 }
 
-export function nextSiblingName(shapes: Shape[], type: Shape['type']): string {
-  const count = flattenTree(shapes).filter((item) => item.node.type === type).length + 1
-  const base = type === 'rectangle' ? 'Rectangle' : type === 'ellipse' ? 'Ellipse' : type === 'frame' ? 'Frame' : 'Text'
-  return `${base} ${count}`
-}
+export function isLockedInTree(shapes: Shape[], id: string): boolean {
+  const entry = flattenTree(shapes).find((item) => item.node.id === id)
+  if (!entry) return false
 
-export function uniqueName(shapes: Shape[], type: Shape['type']): string {
-  return nextSiblingName(shapes, type)
-}
+  let current: Shape | null = entry.node
+  let parentId = entry.parentId
 
-export function createNodeAt(type: Shape['type'], point: Point, width: number, height: number): Shape {
-  return createShape(type, point.x, point.y, width, height)
-}
+  while (current) {
+    if (current.locked) return true
+    if (!parentId) return false
+    current = findNode(shapes, parentId)
+    parentId = current ? findParentId(shapes, current.id) : null
+  }
 
-export function frameDefaults(): typeof DEFAULT_AUTO_LAYOUT {
-  return { ...DEFAULT_AUTO_LAYOUT }
+  return false
 }
