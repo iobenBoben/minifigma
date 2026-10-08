@@ -27,11 +27,26 @@ export function PropertiesPanel({ shape, onUpdate, onDuplicate, onDelete }: Prop
     )
   }
 
-  const set = (updates: Partial<Shape>) => onUpdate(shape.id, updates)
-  const setAutoLayout = (updates: Partial<Shape['autoLayout']>) =>
+  const isLocked = shape.locked
+
+  const set = (updates: Partial<Shape>) => {
+    if (isLocked) return
+    onUpdate(shape.id, updates)
+  }
+  const setAutoLayout = (updates: Partial<Shape['autoLayout']>) => {
+    if (isLocked) return
     onUpdate(shape.id, { autoLayout: { ...shape.autoLayout, ...updates } })
-  const setText = (updates: Partial<Shape['text']>) =>
+  }
+  const setText = (updates: Partial<Shape['text']>) => {
+    if (isLocked) return
     onUpdate(shape.id, { text: { ...shape.text, ...updates } })
+  }
+
+  const lockNotice = isLocked ? (
+    <p className="mb-3 rounded-lg border border-[#e0a05c]/25 bg-[#e0a05c]/8 px-3 py-2 text-[10px] leading-4 text-[#e0b07c]">
+      Слой заблокирован — свойства не редактируются. Снимите замок в панели слоёв.
+    </p>
+  ) : null
 
   return (
     <aside className="max-h-[62vh] overflow-y-auto border-b border-white/8 px-4 py-4">
@@ -43,6 +58,8 @@ export function PropertiesPanel({ shape, onUpdate, onDuplicate, onDelete }: Prop
           {shape.type}
         </span>
       </div>
+
+      {lockNotice}
 
       <Field label="Name">
         <input
