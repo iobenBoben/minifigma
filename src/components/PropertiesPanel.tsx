@@ -155,7 +155,7 @@ export function PropertiesPanel({ shape, onUpdate, onDuplicate, onDelete }: Prop
         </>
       ) : null}
 
-      {shape.type === 'rectangle' ? (
+      {shape.type === 'rectangle' || shape.type === 'ellipse' ? (
         <NumberField
           label="Radius"
           value={shape.radius}

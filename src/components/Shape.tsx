@@ -61,7 +61,7 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onSelect }: ShapeProps)
         ...baseStyle,
         backgroundColor: isText || isVector ? 'transparent' : shape.fill,
         border: !isVector && shape.strokeWidth > 0 ? `${shape.strokeWidth}px solid ${shape.stroke}` : undefined,
-        borderRadius: isEllipse ? '9999px' : shape.radius,
+        borderRadius: isEllipse ? (shape.radius > 0 ? shape.radius : '50%') : shape.radius,
       }}
       onPointerDown={(event) => onSelect(event)}
       data-node={shape.id}
