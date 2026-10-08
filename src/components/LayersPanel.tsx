@@ -137,7 +137,7 @@ function LayerRow({
         onDragOver={(event) => {
           event.preventDefault()
           event.stopPropagation()
-          onDragOverRow(shape.id, dropModeFromEvent(event, isContainer))
+          onDragOverRow(shape.id, dropModeFromEvent(event, shape.type === 'frame'))
         }}
         onDrop={(event) => {
           event.preventDefault()
@@ -243,15 +243,15 @@ function LayerRow({
 }
 
 /**
- * Верхняя и нижняя четверти строки — вставка рядом, середина контейнера — внутрь.
- * Для строки без детей середина делит пополам, чтобы «до» и «после» были равнозначны.
+ * Верхняя и нижняя четверти строки — вставка рядом, середина фрейма — внутрь.
+ * Для остальных строк середина делит пополам, чтобы «до» и «после» были равнозначны.
  */
-function dropModeFromEvent(event: React.DragEvent<HTMLDivElement>, isContainer: boolean): DropMode {
+function dropModeFromEvent(event: React.DragEvent<HTMLDivElement>, canNest: boolean): DropMode {
   const bounds = event.currentTarget.getBoundingClientRect()
   if (bounds.height === 0) return 'after'
 
   const ratio = (event.clientY - bounds.top) / bounds.height
-  if (isContainer) {
+  if (canNest) {
     if (ratio < 0.25) return 'before'
     if (ratio > 0.75) return 'after'
     return 'inside'
