@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Shape } from '../types/shape'
 import { layoutTree } from '../utils/layout'
@@ -13,6 +13,7 @@ import {
 } from '../utils/tree'
 
 const STORAGE_KEY = 'mini-figma:document:v1'
+const SAVE_DEBOUNCE_MS = 400
 
 export interface UseShapesResult {
   shapes: Shape[]
@@ -34,9 +35,7 @@ export function useShapes(): UseShapesResult {
   const [rawShapes, setRawShapes] = useState<Shape[]>(loadShapes)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  useEffect(() => {
-    saveShapes(rawShapes)
-  }, [rawShapes])
+  useDebouncedEffect(saveShapes, [rawShapes], SAVE_DEBOUNCE_MS)
 
   const shapes = useMemo(() => layoutTree(rawShapes), [rawShapes])
   const flat = useMemo(() => flattenTree(shapes), [shapes])
@@ -173,4 +172,22 @@ function saveShapes(shapes: Shape[]): void {
   } catch {
     // Переполненное хранилище или приватный режим — работа продолжается без автосохранения.
   }
+}
+
+/** Откладывает запись, чтобы перетаскивание фигуры не сериализовало дерево на каждый кадр. */
+function useDebouncedEffect(
+  effect: (value: Shape[]) => void,
+  [value]: [Shape[]],
+  delayMs: number,
+): void {
+  const latest = useRef(value)
+
+  useEffect(() => {
+    latest.current = value
+  }, [value])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => effect(latest.current), delayMs)
+    return () => window.clearTimeout(timer)
+  }, [value, delayMs, effect])
 }
