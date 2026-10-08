@@ -15,6 +15,8 @@ import {
 const STORAGE_KEY = 'mini-figma:document:v1'
 const SAVE_DEBOUNCE_MS = 400
 
+let idCounter = 0
+
 export interface UseShapesResult {
   shapes: Shape[]
   selectedId: string | null
@@ -65,7 +67,8 @@ export function useShapes(): UseShapesResult {
   }, [])
 
   const duplicateShape = useCallback((id: string) => {
-    let cloneId: string | null = null
+    const cloneId = createNodeId()
+    let created = false
 
     setRawShapes((current) => {
       const node = findNode(current, id)
@@ -73,15 +76,16 @@ export function useShapes(): UseShapesResult {
 
       const clone = cloneWithNewIds({
         ...node,
+        id: cloneId,
         name: `${node.name} copy`,
         x: node.x + 16,
         y: node.y + 16,
       })
-      cloneId = clone.id
+      created = true
       return insertAfter(current, id, clone) ?? current
     })
 
-    if (cloneId) setSelectedId(cloneId)
+    if (created) setSelectedId(cloneId)
   }, [])
 
   const reorderShape = useCallback((id: string, parentId: string | null, index?: number) => {
@@ -121,10 +125,15 @@ export function useShapes(): UseShapesResult {
   }
 }
 
+function createNodeId(): string {
+  idCounter += 1
+  return `node-${Date.now().toString(36)}-${idCounter}`
+}
+
 function cloneWithNewIds(node: Shape): Shape {
   return {
     ...node,
-    id: `${node.type}-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6)}`,
+    id: createNodeId(),
     children: node.children.map((child) => cloneWithNewIds(child)),
   }
 }
