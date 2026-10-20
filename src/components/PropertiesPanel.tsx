@@ -151,26 +151,34 @@ export function PropertiesPanel({ shape, onUpdate, onArrange, onUngroup, onDupli
         </div>
       ) : null}
 
+      <Field label="Stroke">
+        <div className="flex items-center gap-2">
+          <input
+            type="color"
+            value={shape.stroke === 'transparent' ? '#0a0c11' : shape.stroke}
+            onChange={(event) => set({ stroke: event.target.value })}
+            className="size-7 cursor-pointer rounded border border-white/10 bg-transparent"
+            aria-label="Stroke color"
+          />
+          <button
+            type="button"
+            onClick={() => set({ stroke: shape.stroke === 'transparent' ? '#8290ee' : 'transparent' })}
+            className="rounded-md border border-white/10 px-2 py-1 text-[10px] font-medium text-[#9a98ad] transition hover:bg-white/6"
+          >
+            {shape.stroke === 'transparent' ? 'Off' : 'On'}
+          </button>
+          <span className="text-[11px] uppercase text-[#8b8aa3]">{shape.stroke}</span>
+        </div>
+      </Field>
+      <NumberField
+        label="Stroke width"
+        value={shape.strokeWidth}
+        min={0}
+        onChange={(value) => set({ strokeWidth: value })}
+      />
+
       {shape.type === 'vector' ? (
         <>
-          <Field label="Stroke">
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={shape.stroke}
-                onChange={(event) => set({ stroke: event.target.value })}
-                className="size-7 cursor-pointer rounded border border-white/10 bg-transparent"
-                aria-label="Stroke color"
-              />
-              <span className="text-[11px] uppercase text-[#8b8aa3]">{shape.stroke}</span>
-            </div>
-          </Field>
-          <NumberField
-            label="Stroke width"
-            value={shape.strokeWidth}
-            min={1}
-            onChange={(value) => set({ strokeWidth: value })}
-          />
           <button
             type="button"
             onClick={() => set({ vector: { ...shape.vector, closed: !shape.vector.closed } })}
