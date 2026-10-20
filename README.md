@@ -33,6 +33,12 @@ A small React + TypeScript + Tailwind CSS canvas prototype built with Vite.
 - **Layer order** — bring to front, send to back, bring forward and send backward in the
   properties panel. A layer only changes its place among its own siblings.
 - **Grab offset** — a shape follows the cursor from the exact point it was grabbed.
+- **Groups** — select several shapes with `Shift` and press `Ctrl+G` to group them,
+  `Ctrl+Shift+G` to ungroup. Moving a group moves its contents, resizing scales them.
+- **Export PNG** — the button in the header saves the document as a PNG at double resolution.
+  The second button saves it with a transparent background.
+- **Shadow** — a drop shadow with offset, blur and color on any shape.
+- **Stroke** — stroke color and width for every shape type, not only for vectors.
 
 ## Project layout
 
@@ -40,7 +46,7 @@ A small React + TypeScript + Tailwind CSS canvas prototype built with Vite.
 src/
   constants/   палитра, инструменты, значения по умолчанию
   types/       модели данных
-  utils/       геометрия, дерево слоёв, раскладка, векторные пути, загрузка картинок
+  utils/       геометрия, дерево слоёв, раскладка, векторные пути, картинки, экспорт
   hooks/       состояние документа с историей, камера, горячие клавиши
   components/  Canvas, Shape, Toolbar, LayersPanel, PropertiesPanel
 ```
