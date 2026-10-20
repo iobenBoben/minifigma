@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef } from 'react'
 
-import type { Shape as ShapeModel } from '../types/shape'
+import type { ShadowProps, Shape as ShapeModel } from '../types/shape'
 import { buildPathData } from '../utils/vector'
 
 interface ShapeProps {
@@ -31,7 +31,7 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onAutoHeight, onSelect 
     return (
       <div
         className="absolute"
-        style={baseStyle}
+        style={{ ...baseStyle, filter: shadowFilter(shape.shadow) }}
         onPointerDown={(event) => onSelect(event)}
         data-frame={shape.id}
         data-group={isGroup ? shape.id : undefined}
@@ -69,61 +69,76 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onAutoHeight, onSelect 
       className={`absolute ${
         isSelected && !isGhost ? 'ring-2 ring-[#8290ee]' : ''
       }`}
-      style={{
-        ...baseStyle,
-        backgroundColor: isText || isVector || isImage ? 'transparent' : shape.fill,
-        border: !isVector && shape.strokeWidth > 0 ? `${shape.strokeWidth}px solid ${shape.stroke}` : undefined,
-        borderRadius: isEllipse ? (shape.radius > 0 ? shape.radius : '50%') : shape.radius,
-      }}
+      style={baseStyle}
       onPointerDown={(event) => onSelect(event)}
       data-node={shape.id}
     >
-      {isVector ? (
-        <svg
-          className="h-full w-full overflow-visible"
-          viewBox={`0 0 ${shape.width} ${shape.height}`}
-          preserveAspectRatio="none"
-        >
-          <path
-            d={buildPathData(shape.vector.vertices, shape.vector.closed)}
-            fill={shape.fill === 'transparent' ? 'none' : shape.fill}
-            stroke={shape.stroke}
-            strokeWidth={shape.strokeWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      {/* Тень лежит на внутреннем слое: она повторяет форму фигуры, а не рамку выделения. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundColor: isText || isVector || isImage ? 'transparent' : shape.fill,
+          border:
+            !isVector && shape.strokeWidth > 0 && shape.stroke !== 'transparent'
+              ? `${shape.strokeWidth}px solid ${shape.stroke}`
+              : undefined,
+          borderRadius: isEllipse ? (shape.radius > 0 ? shape.radius : '50%') : shape.radius,
+          filter: shadowFilter(shape.shadow),
+        }}
+      >
+        {isVector ? (
+          <svg
+            className="h-full w-full overflow-visible"
+            viewBox={`0 0 ${shape.width} ${shape.height}`}
+            preserveAspectRatio="none"
+          >
+            <path
+              d={buildPathData(shape.vector.vertices, shape.vector.closed)}
+              fill={shape.fill === 'transparent' ? 'none' : shape.fill}
+              stroke={shape.stroke}
+              strokeWidth={shape.strokeWidth}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            {isSelected && !isGhost
+              ? shape.vector.vertices.map((vertex, index) => (
+                  <circle
+                    key={index}
+                    cx={vertex.x}
+                    cy={vertex.y}
+                    r={3}
+                    fill="#f2f4fb"
+                    stroke="#0a0c11"
+                    strokeWidth={1}
+                  />
+                ))
+              : null}
+          </svg>
+        ) : null}
+        {isImage ? (
+          <img
+            src={shape.image.src}
+            alt={shape.image.alt}
+            className="h-full w-full"
+            draggable={false}
           />
-          {isSelected && !isGhost
-            ? shape.vector.vertices.map((vertex, index) => (
-                <circle
-                  key={index}
-                  cx={vertex.x}
-                  cy={vertex.y}
-                  r={3}
-                  fill="#f2f4fb"
-                  stroke="#0a0c11"
-                  strokeWidth={1}
-                />
-              ))
-            : null}
-        </svg>
-      ) : null}
-      {isImage ? (
-        <img
-          src={shape.image.src}
-          alt={shape.image.alt}
-          className="h-full w-full"
-          draggable={false}
-        />
-      ) : null}
-      {isText ? (
-        <MeasuredText
-          shape={shape}
-          disabled={Boolean(isGhost)}
-          onAutoHeight={onAutoHeight}
-        />
-      ) : null}
+        ) : null}
+        {isText ? (
+          <MeasuredText
+            shape={shape}
+            disabled={Boolean(isGhost)}
+            onAutoHeight={onAutoHeight}
+          />
+        ) : null}
+      </div>
     </div>
   )
+}
+
+/** Тень рисуется по фактической форме фигуры, поэтому фильтр, а не box-shadow. */
+function shadowFilter(shadow: ShadowProps | null): string | undefined {
+  if (!shadow) return undefined
+  return `drop-shadow(${shadow.offsetX}px ${shadow.offsetY}px ${shadow.blur}px ${shadow.color})`
 }
 
 /**

@@ -394,12 +394,19 @@ function loadShapes(): Shape[] {
   }
 }
 
-/** Документы, созданные до появления картинок, не содержат поля image — дополняем их. */
+/** Документы, созданные до появления картинок и теней, не содержат этих полей. */
 function withDefaults(node: Shape): Shape {
-  const stored = (node as unknown as { image?: Partial<Shape['image']> }).image
+  const stored = node as unknown as {
+    image?: Partial<Shape['image']>
+    shadow?: Shape['shadow']
+  }
+
   return {
     ...node,
-    image: { ...DEFAULT_IMAGE, ...(stored ?? {}) },
+    image: { ...DEFAULT_IMAGE, ...(stored.image ?? {}) },
+    // Старые фреймы хранили служебный цвет обводки, который никогда не показывался.
+    stroke: node.type === 'frame' && node.stroke === '#5a5d72' ? 'transparent' : node.stroke,
+    shadow: stored.shadow ?? null,
     children: node.children.map(withDefaults),
   }
 }

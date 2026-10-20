@@ -1,6 +1,7 @@
 import type {
   AutoLayout,
   ImageProps,
+  ShadowProps,
   Shape,
   ShapeType,
   TextProps,
@@ -35,7 +36,7 @@ export const TOOLS: ReadonlyArray<{
 export const SHAPE_PALETTE: Record<ShapeType, { fill: string; stroke: string }> = {
   rectangle: { fill: '#4a5bc4', stroke: '#8290ee' },
   ellipse: { fill: '#1a6f80', stroke: '#3fc4d4' },
-  frame: { fill: 'transparent', stroke: '#5a5d72' },
+  frame: { fill: 'transparent', stroke: 'transparent' },
   text: { fill: '#f2f4fb', stroke: 'transparent' },
   vector: { fill: 'transparent', stroke: '#8290ee' },
   image: { fill: 'transparent', stroke: '#5a5d72' },
@@ -63,6 +64,13 @@ export const DEFAULT_VECTOR: VectorProps = {
 export const DEFAULT_IMAGE: ImageProps = {
   src: '',
   alt: '',
+}
+
+export const DEFAULT_SHADOW: ShadowProps = {
+  offsetX: 0,
+  offsetY: 6,
+  blur: 16,
+  color: 'rgba(0, 0, 0, 0.45)',
 }
 
 export const DEFAULT_TEXT: TextProps = {
@@ -123,6 +131,7 @@ export function createShape(
     text: { ...DEFAULT_TEXT },
     vector: { ...DEFAULT_VECTOR, vertices: [] },
     image: { ...DEFAULT_IMAGE },
+    shadow: null,
     children: [],
   }
 }

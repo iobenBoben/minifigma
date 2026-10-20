@@ -67,6 +67,13 @@ export interface ImageProps {
   alt: string
 }
 
+export interface ShadowProps {
+  offsetX: number
+  offsetY: number
+  blur: number
+  color: string
+}
+
 export interface Shape {
   id: string
   name: string
@@ -87,5 +94,6 @@ export interface Shape {
   text: TextProps
   vector: VectorProps
   image: ImageProps
+  shadow: ShadowProps | null
   children: Shape[]
 }

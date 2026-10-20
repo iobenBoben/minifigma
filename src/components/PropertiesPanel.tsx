@@ -1,4 +1,4 @@
-import { FONT_STACKS, FONT_STYLES } from '../constants/tools'
+import { DEFAULT_SHADOW, FONT_STACKS, FONT_STYLES } from '../constants/tools'
 import type { AlignItems, JustifyContent, LayoutMode, Shape, TextAlign } from '../types/shape'
 import type { ArrangePosition } from '../utils/tree'
 
@@ -190,6 +190,58 @@ export function PropertiesPanel({ shape, onUpdate, onArrange, onUngroup, onDupli
         />
       ) : null}
 
+      <div className="mt-4 space-y-2 rounded-lg border border-white/8 bg-white/3 p-2.5">
+        <div className="flex items-center justify-between">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#807e96]">
+            Shadow
+          </p>
+          <button
+            type="button"
+            onClick={() => set({ shadow: shape.shadow ? null : { ...DEFAULT_SHADOW } })}
+            className="rounded-md border border-white/10 px-2 py-1 text-[10px] font-medium text-[#9a98ad] transition hover:bg-white/6"
+          >
+            {shape.shadow ? 'Remove' : 'Add'}
+          </button>
+        </div>
+
+        {shape.shadow ? (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <NumberField
+                label="X"
+                value={shape.shadow.offsetX}
+                onChange={(value) => set({ shadow: { ...shape.shadow!, offsetX: value } })}
+              />
+              <NumberField
+                label="Y"
+                value={shape.shadow.offsetY}
+                onChange={(value) => set({ shadow: { ...shape.shadow!, offsetY: value } })}
+              />
+            </div>
+            <NumberField
+              label="Blur"
+              value={shape.shadow.blur}
+              min={0}
+              onChange={(value) => set({ shadow: { ...shape.shadow!, blur: value } })}
+            />
+            <Field label="Color">
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={shadowColorOf(shape.shadow.color)}
+                  onChange={(event) =>
+                    set({ shadow: { ...shape.shadow!, color: toShadowColor(event.target.value, shape.shadow!.color) } })
+                  }
+                  className="size-7 cursor-pointer rounded border border-white/10 bg-transparent"
+                  aria-label="Shadow color"
+                />
+                <span className="text-[11px] uppercase text-[#8b8aa3]">{shape.shadow.color}</span>
+              </div>
+            </Field>
+          </>
+        ) : null}
+      </div>
+
       {shape.type === 'frame' ? (
         <div className="mt-4 space-y-2 rounded-lg border border-white/8 bg-white/3 p-2.5">
           <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#807e96]">
@@ -358,6 +410,24 @@ export function PropertiesPanel({ shape, onUpdate, onArrange, onUngroup, onDupli
 
 const inputClass =
   'w-full rounded-md border border-white/10 bg-[#101219] px-2 py-1.5 text-[11px] text-[#e7e4f5] outline-none focus:border-[#5b6bd8]'
+
+/** Поле выбора цвета понимает только непрозрачный цвет — прозрачность задаётся отдельно. */
+function shadowColorOf(color: string): string {
+  return color.startsWith('#') ? color : '#000000'
+}
+
+/** Сохраняет прозрачность тени, когда меняется цвет. */
+function toShadowColor(hex: string, current: string): string {
+  const alpha = current.match(/rgba?\([^)]*,\s*([0-9.]+)\s*\)/)?.[1]
+  return alpha ? `rgba(${hexToRgb(hex)}, ${alpha})` : hex
+}
+
+function hexToRgb(hex: string): string {
+  const value = hex.replace('#', '')
+  const full = value.length === 3 ? value.split('').map((char) => char + char).join('') : value
+  const int = parseInt(full, 16)
+  return `${(int >> 16) & 255}, ${(int >> 8) & 255}, ${int & 255}`
+}
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

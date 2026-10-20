@@ -102,6 +102,13 @@ async function drawShape(
   context.globalAlpha = shape.opacity / 100
   context.translate(shape.x, shape.y)
 
+  if (shape.shadow) {
+    context.shadowColor = shape.shadow.color
+    context.shadowBlur = shape.shadow.blur
+    context.shadowOffsetX = shape.shadow.offsetX
+    context.shadowOffsetY = shape.shadow.offsetY
+  }
+
   const centerX = shape.width / 2
   const centerY = shape.height / 2
 
