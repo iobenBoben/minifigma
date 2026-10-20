@@ -18,6 +18,8 @@ interface UseHotkeysOptions {
   onEscape: () => void
   onUndo: () => void
   onRedo: () => void
+  onCopy: () => void
+  onPaste: () => void
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -36,6 +38,8 @@ export function useHotkeys({
   onEscape,
   onUndo,
   onRedo,
+  onCopy,
+  onPaste,
 }: UseHotkeysOptions): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -59,6 +63,16 @@ export function useHotkeys({
         if (key === 'y') {
           event.preventDefault()
           onRedo()
+          return
+        }
+        if (key === 'c') {
+          event.preventDefault()
+          onCopy()
+          return
+        }
+        if (key === 'v') {
+          event.preventDefault()
+          onPaste()
           return
         }
       }
@@ -85,5 +99,5 @@ export function useHotkeys({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onDelete, onDuplicate, onEscape, onRedo, onToolChange, onUndo])
+  }, [onCopy, onDelete, onDuplicate, onEscape, onPaste, onRedo, onToolChange, onUndo])
 }

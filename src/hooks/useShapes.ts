@@ -90,6 +90,8 @@ export interface UseShapesResult {
   reorderShape: (id: string, parentId: string | null, index?: number) => void
   toggleVisibility: (id: string) => void
   toggleLock: (id: string) => void
+  copyShape: (id: string) => void
+  pasteShape: () => void
   undo: () => void
   redo: () => void
 }
@@ -97,6 +99,7 @@ export interface UseShapesResult {
 export function useShapes(): UseShapesResult {
   const [document, dispatch] = useReducer(documentReducer, undefined, createInitialState)
   const [selectedIdState, setSelectedId] = useState<string | null>(null)
+  const clipboardRef = useRef<string | null>(null)
 
   const rawShapes = document.shapes
 
@@ -204,6 +207,49 @@ export function useShapes(): UseShapesResult {
   const undo = useCallback(() => dispatch({ type: 'undo' }), [])
   const redo = useCallback(() => dispatch({ type: 'redo' }), [])
 
+  const copyShape = useCallback((id: string) => {
+    const node = findNode(rawShapes, id)
+    if (!node) return
+
+    const payload = JSON.stringify(node)
+    clipboardRef.current = payload
+    // Системный буфер нужен, чтобы вставить фигуру в другую вкладку или приложение.
+    if (navigator.clipboard) {
+      void navigator.clipboard.writeText(payload).catch(() => undefined)
+    }
+  }, [rawShapes])
+
+  const pasteShape = useCallback(() => {
+    const apply = (payload: string | null) => {
+      if (!payload) return
+      const source = parseShape(payload)
+      if (!source) return
+
+      const copy = cloneWithNewIds({
+        ...source,
+        name: `${source.name} copy`,
+        x: source.x + 16,
+        y: source.y + 16,
+      })
+
+      commit((current) => insertAfter(current, source.id, copy) ?? [...current, copy])
+      setSelectedId(copy.id)
+    }
+
+    const internal = clipboardRef.current
+    if (internal) {
+      apply(internal)
+      return
+    }
+
+    if (navigator.clipboard) {
+      void navigator.clipboard
+        .readText()
+        .then((text) => apply(text))
+        .catch(() => undefined)
+    }
+  }, [commit])
+
   return {
     shapes,
     selectedId,
@@ -220,6 +266,8 @@ export function useShapes(): UseShapesResult {
     reorderShape,
     toggleVisibility,
     toggleLock,
+    copyShape,
+    pasteShape,
     undo,
     redo,
   }
@@ -293,6 +341,17 @@ function withDefaults(node: Shape): Shape {
     ...node,
     image: { ...DEFAULT_IMAGE, ...(stored ?? {}) },
     children: node.children.map(withDefaults),
+  }
+}
+
+/** Разбирает содержимое буфера: подходит только фигура из этого редактора. */
+function parseShape(payload: string): Shape | null {
+  try {
+    const parsed: unknown = JSON.parse(payload)
+    if (!isShapeNode(parsed)) return null
+    return withDefaults(parsed)
+  } catch {
+    return null
   }
 }
 

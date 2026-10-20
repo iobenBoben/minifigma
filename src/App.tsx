@@ -27,6 +27,8 @@ export default function App() {
     reorderShape,
     toggleVisibility,
     toggleLock,
+    copyShape,
+    pasteShape,
     undo,
     redo,
   } = useShapes()
@@ -47,6 +49,14 @@ export default function App() {
     setPendingImage({ file, token: Date.now() })
   }, [])
 
+  const handleCopy = useCallback(() => {
+    if (selectedId) copyShape(selectedId)
+  }, [copyShape, selectedId])
+
+  const handlePaste = useCallback(() => {
+    pasteShape()
+  }, [pasteShape])
+
   useHotkeys({
     onToolChange: setActiveTool,
     onDelete: handleDelete,
@@ -54,6 +64,8 @@ export default function App() {
     onEscape: handleEscape,
     onUndo: undo,
     onRedo: redo,
+    onCopy: handleCopy,
+    onPaste: handlePaste,
   })
 
   return (
