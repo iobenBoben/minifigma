@@ -8,6 +8,7 @@ import { DEFAULT_TOOL } from './constants/tools'
 import { useHotkeys } from './hooks/useHotkeys'
 import { useShapes } from './hooks/useShapes'
 import type { Tool } from './types/shape'
+import { downloadPng, exportToPng } from './utils/export'
 
 export default function App() {
   const [activeTool, setActiveTool] = useState<Tool>(DEFAULT_TOOL)
@@ -72,6 +73,13 @@ export default function App() {
     if (selectedId) ungroupShape(selectedId)
   }, [selectedId, ungroupShape])
 
+  const handleExport = useCallback(
+    (transparent: boolean) => {
+      void exportToPng(shapes, { transparent }).then((result) => downloadPng(result))
+    },
+    [shapes],
+  )
+
   useHotkeys({
     onToolChange: setActiveTool,
     onDelete: handleDelete,
@@ -115,6 +123,35 @@ export default function App() {
             </p>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => handleExport(false)}
+              className="flex size-7 items-center justify-center rounded-md text-[#86889e] transition hover:bg-white/8 hover:text-[#f0edf9]"
+              aria-label="Export PNG"
+              title="Export PNG"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden="true">
+                <path
+                  d="M12 15.5V4.5M8 8.5l4-4 4 4M5 14v4.5h14V14"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExport(true)}
+              className="flex size-7 items-center justify-center rounded-md text-[#86889e] transition hover:bg-white/8 hover:text-[#f0edf9]"
+              aria-label="Export PNG with transparent background"
+              title="Export PNG · transparent background"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden="true">
+                <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.7" />
+                <path d="M8 16 16 8" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+              </svg>
+            </button>
             <button
               type="button"
               onClick={undo}
