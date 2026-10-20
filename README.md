@@ -22,14 +22,26 @@ A small React + TypeScript + Tailwind CSS canvas prototype built with Vite.
 - Resize handles with Shift for equal sides, `Ctrl+D` to duplicate, `Delete` to remove
 - Document is autosaved to `localStorage` under `mini-figma:document:v1`
 
+## Added features
+
+- **Images** — drag an image file onto the canvas or pick one with the image button in the
+  toolbar. Large files are scaled down to 1024 px and stored inside the document as a data URL.
+- **Undo and redo** — `Ctrl+Z` and `Ctrl+Shift+Z` (`Ctrl+Y` as well). A drag counts as a single
+  step, not one step per mouse frame.
+- **Copy and paste** — `Ctrl+C` and `Ctrl+V`. The clipboard also holds the plain JSON of the
+  shape, so a figure can be pasted into another tab.
+- **Layer order** — bring to front, send to back, bring forward and send backward in the
+  properties panel. A layer only changes its place among its own siblings.
+- **Grab offset** — a shape follows the cursor from the exact point it was grabbed.
+
 ## Project layout
 
 ```
 src/
   constants/   палитра, инструменты, значения по умолчанию
   types/       модели данных
-  utils/       геометрия, дерево слоёв, раскладка, векторные пути
-  hooks/       состояние документа, камера, горячие клавиши
+  utils/       геометрия, дерево слоёв, раскладка, векторные пути, загрузка картинок
+  hooks/       состояние документа с историей, камера, горячие клавиши
   components/  Canvas, Shape, Toolbar, LayersPanel, PropertiesPanel
 ```
 

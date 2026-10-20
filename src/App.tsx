@@ -171,6 +171,20 @@ export default function App() {
         </kbd>
         text
         <span className="mx-2 text-white/20">·</span>
+        <kbd className="mr-1 rounded border border-white/10 bg-white/6 px-1.5 py-0.5 font-sans text-[#c9c6da]">
+          Ctrl
+        </kbd>
+        <span className="mr-1">+</span>
+        <kbd className="mr-1 rounded border border-white/10 bg-white/6 px-1.5 py-0.5 font-sans text-[#c9c6da]">
+          Z
+        </kbd>
+        undo
+        <span className="mx-2 text-white/20">·</span>
+        <kbd className="mr-1 rounded border border-white/10 bg-white/6 px-1.5 py-0.5 font-sans text-[#c9c6da]">
+          C
+        </kbd>
+        copy
+        <span className="mx-2 text-white/20">·</span>
         hold <kbd className="mx-1 rounded border border-white/10 bg-white/6 px-1.5 py-0.5 font-sans text-[#c9c6da]">Space</kbd> to pan
       </div>
     </div>
