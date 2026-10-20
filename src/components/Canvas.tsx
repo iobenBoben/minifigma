@@ -351,24 +351,21 @@ export function Canvas({
     const point = toCanvas(event.clientX, event.clientY)
     const parent = parentId ? flat.find((item) => item.node.id === parentId) : undefined
 
+    // Точка захвата сохраняется: фигура не прыгает под курсор, а следует за ним.
+    const originX = parent ? parent.worldX + node.x : node.x
+    const originY = parent ? parent.worldY + node.y : node.y
+
     interactionRef.current = {
       kind: 'move',
       nodeId: node.id,
       parentId,
       startCanvas: point,
-      origin: {
-        x: parent ? point.x - parent.worldX : point.x,
-        y: parent ? point.y - parent.worldY : point.y,
-      },
+      origin: { x: originX, y: originY },
       pointerId: event.pointerId,
       group: `move:${node.id}:${event.pointerId}`,
     }
 
     onSelect(node.id)
-    onUpdateShape(node.id, {
-      x: parent ? node.x : point.x,
-      y: parent ? node.y : point.y,
-    })
   }
 
   const startResize = (event: ReactPointerEvent<HTMLButtonElement>, handle: Handle) => {
@@ -418,8 +415,8 @@ export function Canvas({
       const parent = interaction.parentId
         ? flat.find((item) => item.node.id === interaction.parentId)
         : undefined
-      const baseX = parent ? interaction.startCanvas.x - parent.worldX : interaction.startCanvas.x
-      const baseY = parent ? interaction.startCanvas.y - parent.worldY : interaction.startCanvas.y
+      const baseX = parent ? interaction.origin.x - parent.worldX : interaction.origin.x
+      const baseY = parent ? interaction.origin.y - parent.worldY : interaction.origin.y
       onUpdateShape(interaction.nodeId, {
         x: baseX + (point.x - interaction.startCanvas.x),
         y: baseY + (point.y - interaction.startCanvas.y),
