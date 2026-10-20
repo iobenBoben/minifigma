@@ -3,7 +3,7 @@ export type DrawTool = 'rectangle' | 'ellipse' | 'frame' | 'text' | 'vector'
 
 export type Tool = 'select' | DrawTool
 
-export type ShapeType = DrawTool | 'image'
+export type ShapeType = DrawTool | 'image' | 'group'
 
 export type LayoutMode = 'none' | 'horizontal' | 'vertical'
 

@@ -39,6 +39,7 @@ export const SHAPE_PALETTE: Record<ShapeType, { fill: string; stroke: string }> 
   text: { fill: '#f2f4fb', stroke: 'transparent' },
   vector: { fill: 'transparent', stroke: '#8290ee' },
   image: { fill: 'transparent', stroke: '#5a5d72' },
+  group: { fill: 'transparent', stroke: 'transparent' },
 }
 
 export const DEFAULT_FRAME_SIZE = { width: 480, height: 320 }
@@ -102,7 +103,9 @@ export function createShape(
             ? 'Path'
             : type === 'image'
               ? 'Image'
-              : 'Ellipse',
+              : type === 'group'
+                ? 'Group'
+                : 'Ellipse',
     type,
     x,
     y,

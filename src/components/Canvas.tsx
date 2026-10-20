@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import { DEFAULT_FRAME_SIZE, DEFAULT_TOOL, SHAPE_PALETTE, createShape } from '../constants/tools'
@@ -6,7 +6,7 @@ import { useViewport } from '../hooks/useViewport'
 import type { Point, Shape as ShapeModel, ShapeType, Tool, VectorVertex } from '../types/shape'
 import { clamp, rectFromPoints, screenToCanvas } from '../utils/geometry'
 import { loadImageFile } from '../utils/image'
-import { isLockedInTree, findNode } from '../utils/tree'
+import { isLockedInTree, findNode, scaleGroupChildren } from '../utils/tree'
 import { buildPathData, normalizeVertices } from '../utils/vector'
 import { Shape } from './Shape'
 
@@ -50,12 +50,15 @@ interface CanvasProps {
   shapes: ShapeModel[]
   flat: ReturnType<typeof import('../utils/tree').flattenTree>
   selectedId: string | null
+  selectedIds: string[]
   activeTool: Tool
   /** Картинка, выбранная в панели инструментов: холст сам ставит её в центр. */
   pendingImage: { file: File; token: number } | null
   onAddShape: (shape: ShapeModel, parentId?: string | null) => void
   onUpdateShape: (id: string, updates: Partial<ShapeModel>, group?: string) => void
+  onScaleGroup: (id: string, rect: Partial<ShapeModel>, children: ShapeModel[], group?: string) => void
   onSelect: (id: string | null) => void
+  onToggleSelect: (id: string) => void
 }
 
 type Interaction =
@@ -83,6 +86,7 @@ type Interaction =
       handle: Handle
       startCanvas: { x: number; y: number }
       origin: { x: number; y: number; width: number; height: number }
+      originChildren: ShapeModel[] | null
       pointerId: number
       group: string
     }
@@ -92,11 +96,14 @@ export function Canvas({
   shapes,
   flat,
   selectedId,
+  selectedIds,
   activeTool,
   pendingImage,
   onAddShape,
   onUpdateShape,
+  onScaleGroup,
   onSelect,
+  onToggleSelect,
 }: CanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const interactionRef = useRef<Interaction | null>(null)
@@ -287,6 +294,25 @@ export function Canvas({
   const selectedEntry = flat.find((item) => item.node.id === selectedId)
   const selectedNode = selectedEntry?.node ?? null
 
+  // Рамка вокруг всего выделения: видна, когда выбрано больше одной фигуры.
+  const multiSelection = useMemo(() => {
+    if (selectedIds.length < 2) return null
+    const entries = flat.filter((item) => selectedIds.includes(item.node.id))
+    if (entries.length === 0) return null
+
+    const left = Math.min(...entries.map((item) => item.boundsX))
+    const top = Math.min(...entries.map((item) => item.boundsY))
+    const right = Math.max(...entries.map((item) => item.boundsX + item.boundsWidth))
+    const bottom = Math.max(...entries.map((item) => item.boundsY + item.boundsHeight))
+
+    return {
+      boundsX: left,
+      boundsY: top,
+      boundsWidth: right - left,
+      boundsHeight: bottom - top,
+    }
+  }, [flat, selectedIds])
+
   const parentOfNode = (nodeId: string): string | null => {
     const entry = flat.find((item) => item.node.id === nodeId)
     return entry?.parentId ?? null
@@ -334,6 +360,14 @@ export function Canvas({
     if (event.button !== 0 || isSpacePressed || activeTool !== 'select') return
     if (isLockedInTree(shapes, node.id)) {
       onSelect(node.id)
+      return
+    }
+
+    // Shift добавляет фигуру к выделению, чтобы можно было собрать группу.
+    if (event.shiftKey) {
+      event.preventDefault()
+      event.stopPropagation()
+      onToggleSelect(node.id)
       return
     }
 
@@ -385,6 +419,8 @@ export function Canvas({
         width: selectedNode.width,
         height: selectedNode.height,
       },
+      // Содержимое группы растягивается пропорционально, поэтому нужны исходные дети.
+      originChildren: selectedNode.type === 'group' ? selectedNode.children : null,
       pointerId: event.pointerId,
       group: `resize:${selectedNode.id}:${event.pointerId}`,
     }
@@ -429,6 +465,17 @@ export function Canvas({
     const dx = point.x - interaction.startCanvas.x
     const dy = point.y - interaction.startCanvas.y
     const next = resizeRect(interaction, dx, dy, event.shiftKey)
+
+    if (interaction.originChildren) {
+      const nextWidth = next.width ?? interaction.origin.width
+      const nextHeight = next.height ?? interaction.origin.height
+      const scaleX = interaction.origin.width > 0 ? nextWidth / interaction.origin.width : 1
+      const scaleY = interaction.origin.height > 0 ? nextHeight / interaction.origin.height : 1
+      const children = scaleGroupChildren(interaction.originChildren, scaleX, scaleY)
+      onScaleGroup(interaction.nodeId, next, children, interaction.group)
+      return
+    }
+
     onUpdateShape(interaction.nodeId, next, interaction.group)
   }
 
@@ -555,6 +602,18 @@ export function Canvas({
               zoom={viewport.zoom}
               isFrame={selectedNode.type === 'frame'}
               onHandlePointerDown={startResize}
+            />
+          ) : null}
+
+          {multiSelection ? (
+            <div
+              className="pointer-events-none absolute border border-dashed border-[#8290ee]"
+              style={{
+                left: multiSelection.boundsX,
+                top: multiSelection.boundsY,
+                width: multiSelection.boundsWidth,
+                height: multiSelection.boundsHeight,
+              }}
             />
           ) : null}
 

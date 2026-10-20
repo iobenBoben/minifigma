@@ -24,19 +24,28 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onAutoHeight, onSelect 
     transform: shape.rotation ? `rotate(${shape.rotation}deg)` : undefined,
   }
 
-  if (shape.type === 'frame') {
+  if (shape.type === 'frame' || shape.type === 'group') {
+    const isGroup = shape.type === 'group'
+    const hasStroke = shape.strokeWidth > 0 && shape.stroke !== 'transparent'
+
     return (
       <div
         className="absolute"
         style={baseStyle}
         onPointerDown={(event) => onSelect(event)}
         data-frame={shape.id}
+        data-group={isGroup ? shape.id : undefined}
       >
-        <div
-          className={`pointer-events-none absolute inset-0 rounded-[2px] border ${
-            isSelected ? 'border-[#8290ee]' : 'border-white/22'
-          }`}
-        />
+        {isGroup ? null : (
+          <div
+            className="pointer-events-none absolute inset-0 rounded-[2px]"
+            style={
+              hasStroke
+                ? { border: `${shape.strokeWidth}px solid ${shape.stroke}` }
+                : { border: `1px solid ${isSelected ? '#8290ee' : 'rgba(255,255,255,0.22)'}` }
+            }
+          />
+        )}
         {shape.children.map((child) => (
           <ShapeImpl
             key={child.id}

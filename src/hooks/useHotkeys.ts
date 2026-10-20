@@ -20,6 +20,8 @@ interface UseHotkeysOptions {
   onRedo: () => void
   onCopy: () => void
   onPaste: () => void
+  onGroup: () => void
+  onUngroup: () => void
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -40,6 +42,8 @@ export function useHotkeys({
   onRedo,
   onCopy,
   onPaste,
+  onGroup,
+  onUngroup,
 }: UseHotkeysOptions): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -75,6 +79,12 @@ export function useHotkeys({
           onPaste()
           return
         }
+        if (key === 'g') {
+          event.preventDefault()
+          if (event.shiftKey) onUngroup()
+          else onGroup()
+          return
+        }
       }
 
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -99,5 +109,5 @@ export function useHotkeys({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onCopy, onDelete, onDuplicate, onEscape, onPaste, onRedo, onToolChange, onUndo])
+  }, [onCopy, onDelete, onDuplicate, onEscape, onGroup, onPaste, onRedo, onToolChange, onUndo, onUngroup])
 }

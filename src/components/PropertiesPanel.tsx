@@ -6,6 +6,7 @@ interface PropertiesPanelProps {
   shape: Shape | null
   onUpdate: (id: string, updates: Partial<Shape>) => void
   onArrange: (id: string, position: ArrangePosition) => void
+  onUngroup: (id: string) => void
   onDuplicate: (id: string) => void
   onDelete: (id: string) => void
 }
@@ -22,7 +23,7 @@ const ALIGN_ITEMS: AlignItems[] = ['start', 'center', 'end']
 const JUSTIFY: JustifyContent[] = ['start', 'center', 'end', 'space-between']
 const TEXT_ALIGNS: TextAlign[] = ['LEFT', 'CENTER', 'RIGHT']
 
-export function PropertiesPanel({ shape, onUpdate, onArrange, onDuplicate, onDelete }: PropertiesPanelProps) {
+export function PropertiesPanel({ shape, onUpdate, onArrange, onUngroup, onDuplicate, onDelete }: PropertiesPanelProps) {
   if (!shape) {
     return (
       <aside className="border-b border-white/8 px-4 py-4">
@@ -295,6 +296,16 @@ export function PropertiesPanel({ shape, onUpdate, onArrange, onDuplicate, onDel
             onChange={(value) => setText({ textAlign: value as TextAlign })}
           />
         </div>
+      ) : null}
+
+      {shape.type === 'group' ? (
+        <button
+          type="button"
+          onClick={() => onUngroup(shape.id)}
+          className="mt-3 w-full rounded-lg border border-white/10 px-2 py-1.5 text-[11px] font-medium text-[#b9b4d1] transition hover:bg-white/6"
+        >
+          Ungroup
+        </button>
       ) : null}
 
       <div className="mt-4">

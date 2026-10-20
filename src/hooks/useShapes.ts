@@ -9,8 +9,10 @@ import {
   findNode,
   findParentId,
   flattenTree,
+  groupNodes,
   moveNodeTo,
   removeNodeFromTree,
+  ungroupNode,
   updateNodeInTree,
 } from '../utils/tree'
 import type { ArrangePosition } from '../utils/tree'
@@ -79,12 +81,14 @@ function documentReducer(state: DocumentState, action: DocumentAction): Document
 export interface UseShapesResult {
   shapes: Shape[]
   selectedId: string | null
+  selectedIds: string[]
   selectedShape: Shape | null
   selectedParentId: string | null
   flat: ReturnType<typeof flattenTree>
   canUndo: boolean
   canRedo: boolean
   select: (id: string | null) => void
+  toggleSelect: (id: string) => void
   addShape: (shape: Shape, parentId?: string | null) => void
   updateShape: (id: string, updates: Partial<Shape>, group?: string) => void
   removeShape: (id: string) => void
@@ -93,6 +97,9 @@ export interface UseShapesResult {
   toggleVisibility: (id: string) => void
   toggleLock: (id: string) => void
   arrangeShape: (id: string, position: ArrangePosition) => void
+  groupShapes: (ids: string[]) => void
+  ungroupShape: (id: string) => void
+  scaleGroup: (id: string, rect: Partial<Shape>, children: Shape[], group?: string) => void
   copyShape: (id: string) => void
   pasteShape: () => void
   undo: () => void
@@ -101,14 +108,17 @@ export interface UseShapesResult {
 
 export function useShapes(): UseShapesResult {
   const [document, dispatch] = useReducer(documentReducer, undefined, createInitialState)
-  const [selectedIdState, setSelectedId] = useState<string | null>(null)
+  const [selection, setSelection] = useState<string[]>([])
   const clipboardRef = useRef<string | null>(null)
 
   const rawShapes = document.shapes
 
-  // Отменённое удаление возвращает фигуру — выделение на ней восстанавливается само.
-  const selectedId =
-    selectedIdState && findNode(rawShapes, selectedIdState) ? selectedIdState : null
+  // Выделение хранит только живые узлы: удалённый слой из выделения выпадает сам.
+  const selectedIds = useMemo(
+    () => selection.filter((id) => findNode(rawShapes, id) !== null),
+    [selection, rawShapes],
+  )
+  const selectedId = selectedIds.length > 0 ? selectedIds[selectedIds.length - 1] : null
 
   useDebouncedEffect(saveShapes, [rawShapes], SAVE_DEBOUNCE_MS)
 
@@ -130,12 +140,18 @@ export function useShapes(): UseShapesResult {
     [],
   )
 
-  const select = useCallback((id: string | null) => setSelectedId(id), [])
+  const select = useCallback((id: string | null) => setSelection(id ? [id] : []), [])
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelection((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
+    )
+  }, [])
 
   const addShape = useCallback(
     (shape: Shape, parentId: string | null = null) => {
       commit((current) => (parentId ? appendChild(current, parentId, shape) : [...current, shape]))
-      setSelectedId(shape.id)
+      setSelection([shape.id])
     },
     [commit],
   )
@@ -155,7 +171,7 @@ export function useShapes(): UseShapesResult {
   const removeShape = useCallback(
     (id: string) => {
       commit((current) => removeNodeFromTree(current, id))
-      setSelectedId((current) => (current === id ? null : current))
+      setSelection((current) => current.filter((item) => item !== id))
     },
     [commit],
   )
@@ -173,7 +189,7 @@ export function useShapes(): UseShapesResult {
       })
 
       commit((current) => insertAfter(current, id, clone) ?? current)
-      setSelectedId(clone.id)
+      setSelection([clone.id])
     },
     [commit, rawShapes],
   )
@@ -217,6 +233,34 @@ export function useShapes(): UseShapesResult {
     [commit],
   )
 
+  const groupShapes = useCallback(
+    (ids: string[]) => {
+      if (ids.length < 2) return
+      const group = groupNodes(rawShapes, ids)
+      if (group === rawShapes) return
+      commit((current) => groupNodes(current, ids))
+      setSelection([])
+    },
+    [commit, rawShapes],
+  )
+
+  const ungroupShape = useCallback(
+    (id: string) => {
+      const next = ungroupNode(rawShapes, id)
+      if (next === rawShapes) return
+      commit((current) => ungroupNode(current, id))
+      setSelection([])
+    },
+    [commit, rawShapes],
+  )
+
+  const scaleGroup = useCallback(
+    (id: string, rect: Partial<Shape>, children: Shape[], group?: string) => {
+      commit((current) => updateNodeInTree(current, id, { ...rect, children }), group)
+    },
+    [commit],
+  )
+
   const copyShape = useCallback((id: string) => {
     const node = findNode(rawShapes, id)
     if (!node) return
@@ -243,7 +287,7 @@ export function useShapes(): UseShapesResult {
       })
 
       commit((current) => insertAfter(current, source.id, copy) ?? [...current, copy])
-      setSelectedId(copy.id)
+      setSelection([copy.id])
     }
 
     const internal = clipboardRef.current
@@ -263,12 +307,14 @@ export function useShapes(): UseShapesResult {
   return {
     shapes,
     selectedId,
+    selectedIds,
     selectedShape,
     selectedParentId,
     flat,
     canUndo: document.past.length > 0,
     canRedo: document.future.length > 0,
     select,
+    toggleSelect,
     addShape,
     updateShape,
     removeShape,
@@ -277,6 +323,9 @@ export function useShapes(): UseShapesResult {
     toggleVisibility,
     toggleLock,
     arrangeShape,
+    groupShapes,
+    ungroupShape,
+    scaleGroup,
     copyShape,
     pasteShape,
     undo,

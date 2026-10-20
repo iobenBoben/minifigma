@@ -16,10 +16,12 @@ export default function App() {
     shapes,
     flat,
     selectedId,
+    selectedIds,
     selectedShape,
     canUndo,
     canRedo,
     select,
+    toggleSelect,
     addShape,
     updateShape,
     removeShape,
@@ -28,6 +30,9 @@ export default function App() {
     toggleVisibility,
     toggleLock,
     arrangeShape,
+    groupShapes,
+    ungroupShape,
+    scaleGroup,
     copyShape,
     pasteShape,
     undo,
@@ -58,6 +63,15 @@ export default function App() {
     pasteShape()
   }, [pasteShape])
 
+  const handleGroup = useCallback(() => {
+    if (selectedIds.length < 2) return
+    groupShapes(selectedIds)
+  }, [groupShapes, selectedIds])
+
+  const handleUngroup = useCallback(() => {
+    if (selectedId) ungroupShape(selectedId)
+  }, [selectedId, ungroupShape])
+
   useHotkeys({
     onToolChange: setActiveTool,
     onDelete: handleDelete,
@@ -67,6 +81,8 @@ export default function App() {
     onRedo: redo,
     onCopy: handleCopy,
     onPaste: handlePaste,
+    onGroup: handleGroup,
+    onUngroup: handleUngroup,
   })
 
   return (
@@ -75,11 +91,14 @@ export default function App() {
         shapes={shapes}
         flat={flat}
         selectedId={selectedId}
+        selectedIds={selectedIds}
         activeTool={activeTool}
         pendingImage={pendingImage}
         onAddShape={addShape}
         onUpdateShape={updateShape}
+        onScaleGroup={scaleGroup}
         onSelect={select}
+        onToggleSelect={toggleSelect}
       />
       <Toolbar
         activeTool={activeTool}
@@ -142,6 +161,7 @@ export default function App() {
           shape={selectedShape}
           onUpdate={updateShape}
           onArrange={arrangeShape}
+          onUngroup={ungroupShape}
           onDuplicate={duplicateShape}
           onDelete={removeShape}
         />

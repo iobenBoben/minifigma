@@ -1,3 +1,4 @@
+import { createShape } from '../constants/tools'
 import type { Point, Shape } from '../types/shape'
 
 interface FlatNode {
@@ -131,6 +132,80 @@ export function siblingIndex(shapes: Shape[], id: string): number {
 }
 
 export type ArrangePosition = 'front' | 'back' | 'forward' | 'backward'
+
+/**
+ * Объединяет выбранные узлы в группу. Узлы должны быть соседями: общий родитель.
+ * Дети группы хранят координаты относительно её левого верхнего угла.
+ */
+export function groupNodes(shapes: Shape[], ids: string[]): Shape[] {
+  if (ids.length < 2) return shapes
+
+  const parentId = findParentId(shapes, ids[0])
+  const siblings = parentId ? findNode(shapes, parentId)?.children : shapes
+  if (!siblings) return shapes
+
+  const targets: Shape[] = []
+  for (const id of ids) {
+    const target = siblings.find((node) => node.id === id)
+    if (!target) return shapes
+    targets.push(target)
+  }
+
+  const minX = Math.min(...targets.map((node) => node.x))
+  const minY = Math.min(...targets.map((node) => node.y))
+  const maxX = Math.max(...targets.map((node) => node.x + node.width))
+  const maxY = Math.max(...targets.map((node) => node.y + node.height))
+
+  const group = createShape('group', minX, minY, maxX - minX, maxY - minY)
+  group.name = 'Group'
+  group.children = targets.map((node) => ({ ...node, x: node.x - minX, y: node.y - minY }))
+
+  const firstIndex = siblings.findIndex((node) => ids.includes(node.id))
+  const rest = siblings.filter((node) => !ids.includes(node.id))
+  rest.splice(Math.min(firstIndex, rest.length), 0, group)
+
+  return replaceChildren(shapes, parentId, rest)
+}
+
+/** Разбирает группу: её дети выходят на место группы, координаты пересчитываются. */
+export function ungroupNode(shapes: Shape[], id: string): Shape[] {
+  const parentId = findParentId(shapes, id)
+  const group = findNode(shapes, id)
+  if (!group || group.type !== 'group') return shapes
+
+  const siblings = parentId ? findNode(shapes, parentId)?.children : shapes
+  if (!siblings) return shapes
+
+  const index = siblings.findIndex((node) => node.id === id)
+  if (index === -1) return shapes
+
+  const children = group.children.map((child) => ({
+    ...child,
+    x: child.x + group.x,
+    y: child.y + group.y,
+  }))
+
+  const next = [...siblings]
+  next.splice(index, 1, ...children)
+
+  return replaceChildren(shapes, parentId, next)
+}
+
+/** Растягивает содержимое группы пропорционально её новому размеру. */
+export function scaleGroupChildren(children: Shape[], scaleX: number, scaleY: number): Shape[] {
+  return children.map((child) => ({
+    ...child,
+    x: child.x * scaleX,
+    y: child.y * scaleY,
+    width: child.width * scaleX,
+    height: child.height * scaleY,
+  }))
+}
+
+function replaceChildren(shapes: Shape[], parentId: string | null, children: Shape[]): Shape[] {
+  if (parentId === null) return children
+  return shapes.map((node) => (node.id === parentId ? { ...node, children } : node))
+}
 
 /**
  * Меняет порядок узла среди его соседей: вперёд, назад, на передний или на задний план.
