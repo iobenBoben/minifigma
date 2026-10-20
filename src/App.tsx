@@ -27,6 +27,7 @@ export default function App() {
     reorderShape,
     toggleVisibility,
     toggleLock,
+    arrangeShape,
     copyShape,
     pasteShape,
     undo,
@@ -140,6 +141,7 @@ export default function App() {
         <PropertiesPanel
           shape={selectedShape}
           onUpdate={updateShape}
+          onArrange={arrangeShape}
           onDuplicate={duplicateShape}
           onDelete={removeShape}
         />

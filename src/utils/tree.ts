@@ -130,6 +130,46 @@ export function siblingIndex(shapes: Shape[], id: string): number {
   return -1
 }
 
+export type ArrangePosition = 'front' | 'back' | 'forward' | 'backward'
+
+/**
+ * Меняет порядок узла среди его соседей: вперёд, назад, на передний или на задний план.
+ * Узел перемещается внутри своего родителя — структура документа не меняется.
+ */
+export function arrangeNodeInTree(
+  shapes: Shape[],
+  id: string,
+  position: ArrangePosition,
+): Shape[] {
+  const index = shapes.findIndex((node) => node.id === id)
+  if (index !== -1) return reorderWithin(shapes, index, position)
+
+  let changed = false
+  const next = shapes.map((node) => {
+    if (node.children.length === 0) return node
+    const updated = arrangeNodeInTree(node.children, id, position)
+    if (updated === node.children) return node
+    changed = true
+    return { ...node, children: updated }
+  })
+
+  return changed ? next : shapes
+}
+
+function reorderWithin(siblings: Shape[], index: number, position: ArrangePosition): Shape[] {
+  let target = index
+  if (position === 'front') target = siblings.length - 1
+  if (position === 'back') target = 0
+  if (position === 'forward') target = Math.min(index + 1, siblings.length - 1)
+  if (position === 'backward') target = Math.max(index - 1, 0)
+  if (target === index) return siblings
+
+  const next = [...siblings]
+  const [node] = next.splice(index, 1)
+  next.splice(target, 0, node)
+  return next
+}
+
 export function moveNodeTo(shapes: Shape[], id: string, targetParentId: string | null, targetIndex: number): Shape[] {
   const node = findNode(shapes, id)
   if (!node) return shapes

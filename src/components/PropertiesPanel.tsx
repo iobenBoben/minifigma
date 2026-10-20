@@ -1,19 +1,28 @@
 import { FONT_STACKS, FONT_STYLES } from '../constants/tools'
 import type { AlignItems, JustifyContent, LayoutMode, Shape, TextAlign } from '../types/shape'
+import type { ArrangePosition } from '../utils/tree'
 
 interface PropertiesPanelProps {
   shape: Shape | null
   onUpdate: (id: string, updates: Partial<Shape>) => void
+  onArrange: (id: string, position: ArrangePosition) => void
   onDuplicate: (id: string) => void
   onDelete: (id: string) => void
 }
+
+const ARRANGE_BUTTONS: { position: ArrangePosition; label: string; path: string }[] = [
+  { position: 'front', label: 'Bring to front', path: 'M4 9h16M4 15h16M12 4v16' },
+  { position: 'forward', label: 'Bring forward', path: 'M12 20V5M6.5 10.5 12 5l5.5 5.5' },
+  { position: 'backward', label: 'Send backward', path: 'M12 4v15M6.5 13.5 12 19l5.5-5.5' },
+  { position: 'back', label: 'Send to back', path: 'M4 9h16M4 15h16M12 20V4' },
+]
 
 const LAYOUT_MODES: LayoutMode[] = ['none', 'horizontal', 'vertical']
 const ALIGN_ITEMS: AlignItems[] = ['start', 'center', 'end']
 const JUSTIFY: JustifyContent[] = ['start', 'center', 'end', 'space-between']
 const TEXT_ALIGNS: TextAlign[] = ['LEFT', 'CENTER', 'RIGHT']
 
-export function PropertiesPanel({ shape, onUpdate, onDuplicate, onDelete }: PropertiesPanelProps) {
+export function PropertiesPanel({ shape, onUpdate, onArrange, onDuplicate, onDelete }: PropertiesPanelProps) {
   if (!shape) {
     return (
       <aside className="border-b border-white/8 px-4 py-4">
@@ -287,6 +296,34 @@ export function PropertiesPanel({ shape, onUpdate, onDuplicate, onDelete }: Prop
           />
         </div>
       ) : null}
+
+      <div className="mt-4">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#807e96]">
+          Arrange
+        </p>
+        <div className="mt-2 grid grid-cols-4 gap-1.5">
+          {ARRANGE_BUTTONS.map((button) => (
+            <button
+              key={button.position}
+              type="button"
+              onClick={() => onArrange(shape.id, button.position)}
+              className="flex items-center justify-center rounded-lg border border-white/10 py-1.5 text-[#8b8aa3] transition hover:bg-white/6 hover:text-[#e7e4f5]"
+              aria-label={button.label}
+              title={button.label}
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden="true">
+                <path
+                  d={button.path}
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="mt-4 flex gap-2">
         <button

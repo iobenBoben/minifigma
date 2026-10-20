@@ -5,6 +5,7 @@ import { DEFAULT_IMAGE } from '../constants/tools'
 import { layoutTree } from '../utils/layout'
 import {
   appendChild,
+  arrangeNodeInTree,
   findNode,
   findParentId,
   flattenTree,
@@ -12,6 +13,7 @@ import {
   removeNodeFromTree,
   updateNodeInTree,
 } from '../utils/tree'
+import type { ArrangePosition } from '../utils/tree'
 
 const STORAGE_KEY = 'mini-figma:document:v1'
 const SAVE_DEBOUNCE_MS = 400
@@ -90,6 +92,7 @@ export interface UseShapesResult {
   reorderShape: (id: string, parentId: string | null, index?: number) => void
   toggleVisibility: (id: string) => void
   toggleLock: (id: string) => void
+  arrangeShape: (id: string, position: ArrangePosition) => void
   copyShape: (id: string) => void
   pasteShape: () => void
   undo: () => void
@@ -207,6 +210,13 @@ export function useShapes(): UseShapesResult {
   const undo = useCallback(() => dispatch({ type: 'undo' }), [])
   const redo = useCallback(() => dispatch({ type: 'redo' }), [])
 
+  const arrangeShape = useCallback(
+    (id: string, position: ArrangePosition) => {
+      commit((current) => arrangeNodeInTree(current, id, position))
+    },
+    [commit],
+  )
+
   const copyShape = useCallback((id: string) => {
     const node = findNode(rawShapes, id)
     if (!node) return
@@ -266,6 +276,7 @@ export function useShapes(): UseShapesResult {
     reorderShape,
     toggleVisibility,
     toggleLock,
+    arrangeShape,
     copyShape,
     pasteShape,
     undo,
