@@ -16,6 +16,8 @@ export default function App() {
     flat,
     selectedId,
     selectedShape,
+    canUndo,
+    canRedo,
     select,
     addShape,
     updateShape,
@@ -24,6 +26,8 @@ export default function App() {
     reorderShape,
     toggleVisibility,
     toggleLock,
+    undo,
+    redo,
   } = useShapes()
 
   const handleDelete = useCallback(() => {
@@ -43,6 +47,8 @@ export default function App() {
     onDelete: handleDelete,
     onDuplicate: handleDuplicate,
     onEscape: handleEscape,
+    onUndo: undo,
+    onRedo: redo,
   })
 
   return (
@@ -66,10 +72,48 @@ export default function App() {
               Mini Figma
             </p>
           </div>
-          <span
-            className="size-2 rounded-full bg-[#5b6bd8] ring-4 ring-[#5b6bd8]/15"
-            aria-label="Document saved"
-          />
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={undo}
+              disabled={!canUndo}
+              className="flex size-7 items-center justify-center rounded-md text-[#86889e] transition enabled:hover:bg-white/8 enabled:hover:text-[#f0edf9] disabled:opacity-25"
+              aria-label="Undo"
+              title="Undo · Ctrl+Z"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden="true">
+                <path
+                  d="M9 7H5v-4M5.5 7.5A8 8 0 1 1 4.6 13"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={redo}
+              disabled={!canRedo}
+              className="flex size-7 items-center justify-center rounded-md text-[#86889e] transition enabled:hover:bg-white/8 enabled:hover:text-[#f0edf9] disabled:opacity-25"
+              aria-label="Redo"
+              title="Redo · Ctrl+Shift+Z"
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="size-4" aria-hidden="true">
+                <path
+                  d="M15 7h4v-4M18.5 7.5A8 8 0 1 0 19.4 13"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            <span
+              className="ml-1 size-2 rounded-full bg-[#5b6bd8] ring-4 ring-[#5b6bd8]/15"
+              aria-label="Document saved"
+            />
+          </div>
         </header>
         <PropertiesPanel
           shape={selectedShape}

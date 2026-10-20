@@ -13,6 +13,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# Посторонние рабочие материалы, не относящиеся к проекту
+catalog/
+
 # Agent tooling installed by the skills CLI
 .agents/
 

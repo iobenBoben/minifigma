@@ -16,6 +16,8 @@ interface UseHotkeysOptions {
   onDelete: () => void
   onDuplicate: () => void
   onEscape: () => void
+  onUndo: () => void
+  onRedo: () => void
 }
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -32,15 +34,33 @@ export function useHotkeys({
   onDelete,
   onDuplicate,
   onEscape,
+  onUndo,
+  onRedo,
 }: UseHotkeysOptions): void {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (isTypingTarget(event.target)) return
 
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'd') {
-        event.preventDefault()
-        onDuplicate()
-        return
+      const modifier = event.ctrlKey || event.metaKey
+      const key = event.key.toLowerCase()
+
+      if (modifier) {
+        if (key === 'd') {
+          event.preventDefault()
+          onDuplicate()
+          return
+        }
+        if (key === 'z') {
+          event.preventDefault()
+          if (event.shiftKey) onRedo()
+          else onUndo()
+          return
+        }
+        if (key === 'y') {
+          event.preventDefault()
+          onRedo()
+          return
+        }
       }
 
       if (event.key === 'Delete' || event.key === 'Backspace') {
@@ -65,5 +85,5 @@ export function useHotkeys({
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onDelete, onDuplicate, onEscape, onToolChange])
+  }, [onDelete, onDuplicate, onEscape, onRedo, onToolChange, onUndo])
 }

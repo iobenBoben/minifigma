@@ -34,7 +34,7 @@ interface CanvasProps {
   selectedId: string | null
   activeTool: Tool
   onAddShape: (shape: ShapeModel, parentId?: string | null) => void
-  onUpdateShape: (id: string, updates: Partial<ShapeModel>) => void
+  onUpdateShape: (id: string, updates: Partial<ShapeModel>, group?: string) => void
   onSelect: (id: string | null) => void
 }
 
@@ -55,6 +55,7 @@ type Interaction =
       startCanvas: { x: number; y: number }
       origin: { x: number; y: number }
       pointerId: number
+      group: string
     }
   | {
       kind: 'resize'
@@ -63,6 +64,7 @@ type Interaction =
       startCanvas: { x: number; y: number }
       origin: { x: number; y: number; width: number; height: number }
       pointerId: number
+      group: string
     }
   | { kind: 'pen'; pointerId: number; anchor: { x: number; y: number } }
 
@@ -110,7 +112,7 @@ export function Canvas({
     (id: string, height: number) => {
       const node = findNode(shapesRef.current, id)
       if (!node || node.height === height) return
-      onUpdateShape(id, { height })
+      onUpdateShape(id, { height }, `autoheight:${id}`)
     },
     [onUpdateShape],
   )
@@ -305,6 +307,7 @@ export function Canvas({
         y: parent ? point.y - parent.worldY : point.y,
       },
       pointerId: event.pointerId,
+      group: `move:${node.id}:${event.pointerId}`,
     }
 
     onSelect(node.id)
@@ -332,6 +335,7 @@ export function Canvas({
         height: selectedNode.height,
       },
       pointerId: event.pointerId,
+      group: `resize:${selectedNode.id}:${event.pointerId}`,
     }
   }
 
@@ -365,7 +369,7 @@ export function Canvas({
       onUpdateShape(interaction.nodeId, {
         x: baseX + (point.x - interaction.startCanvas.x),
         y: baseY + (point.y - interaction.startCanvas.y),
-      })
+      }, interaction.group)
       return
     }
 
@@ -374,7 +378,7 @@ export function Canvas({
     const dx = point.x - interaction.startCanvas.x
     const dy = point.y - interaction.startCanvas.y
     const next = resizeRect(interaction, dx, dy, event.shiftKey)
-    onUpdateShape(interaction.nodeId, next)
+    onUpdateShape(interaction.nodeId, next, interaction.group)
   }
 
   const finishInteraction = () => {

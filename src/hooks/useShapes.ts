@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 
 import type { Shape } from '../types/shape'
 import { layoutTree } from '../utils/layout'
@@ -14,8 +14,64 @@ import {
 
 const STORAGE_KEY = 'mini-figma:document:v1'
 const SAVE_DEBOUNCE_MS = 400
+const HISTORY_LIMIT = 50
 
 let idCounter = 0
+
+interface DocumentState {
+  shapes: Shape[]
+  /** Снимки документа до последних изменений — основа отмены. */
+  past: Shape[][]
+  /** Снимки, отменённые пользователем, — основа повтора. */
+  future: Shape[][]
+  /** Метка текущей группы правок: перетаскивание не должно занимать всю историю. */
+  lastGroup: string | null
+}
+
+type DocumentAction =
+  | { type: 'commit'; updater: (current: Shape[]) => Shape[]; group?: string }
+  | { type: 'undo' }
+  | { type: 'redo' }
+
+function documentReducer(state: DocumentState, action: DocumentAction): DocumentState {
+  switch (action.type) {
+    case 'commit': {
+      const next = action.updater(state.shapes)
+      if (next === state.shapes) return state
+
+      // Продолжение той же группы не добавляет снимок: отмена вернёт к состоянию
+      // до начала перетаскивания, а не к каждому кадру.
+      const continuesGroup = action.group !== undefined && action.group === state.lastGroup
+
+      return {
+        shapes: next,
+        past: continuesGroup ? state.past : [...state.past, state.shapes].slice(-HISTORY_LIMIT),
+        future: [],
+        lastGroup: action.group ?? null,
+      }
+    }
+    case 'undo': {
+      if (state.past.length === 0) return state
+      const previous = state.past[state.past.length - 1]
+      return {
+        shapes: previous,
+        past: state.past.slice(0, -1),
+        future: [state.shapes, ...state.future].slice(0, HISTORY_LIMIT),
+        lastGroup: null,
+      }
+    }
+    case 'redo': {
+      if (state.future.length === 0) return state
+      const [next, ...rest] = state.future
+      return {
+        shapes: next,
+        past: [...state.past, state.shapes].slice(-HISTORY_LIMIT),
+        future: rest,
+        lastGroup: null,
+      }
+    }
+  }
+}
 
 export interface UseShapesResult {
   shapes: Shape[]
@@ -23,19 +79,29 @@ export interface UseShapesResult {
   selectedShape: Shape | null
   selectedParentId: string | null
   flat: ReturnType<typeof flattenTree>
+  canUndo: boolean
+  canRedo: boolean
   select: (id: string | null) => void
   addShape: (shape: Shape, parentId?: string | null) => void
-  updateShape: (id: string, updates: Partial<Shape>) => void
+  updateShape: (id: string, updates: Partial<Shape>, group?: string) => void
   removeShape: (id: string) => void
   duplicateShape: (id: string) => void
   reorderShape: (id: string, parentId: string | null, index?: number) => void
   toggleVisibility: (id: string) => void
   toggleLock: (id: string) => void
+  undo: () => void
+  redo: () => void
 }
 
 export function useShapes(): UseShapesResult {
-  const [rawShapes, setRawShapes] = useState<Shape[]>(loadShapes)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [document, dispatch] = useReducer(documentReducer, undefined, createInitialState)
+  const [selectedIdState, setSelectedId] = useState<string | null>(null)
+
+  const rawShapes = document.shapes
+
+  // Отменённое удаление возвращает фигуру — выделение на ней восстанавливается само.
+  const selectedId =
+    selectedIdState && findNode(rawShapes, selectedIdState) ? selectedIdState : null
 
   useDebouncedEffect(saveShapes, [rawShapes], SAVE_DEBOUNCE_MS)
 
@@ -50,63 +116,92 @@ export function useShapes(): UseShapesResult {
     [selectedId, shapes],
   )
 
+  const commit = useCallback(
+    (updater: (current: Shape[]) => Shape[], group?: string) => {
+      dispatch({ type: 'commit', updater, group })
+    },
+    [],
+  )
+
   const select = useCallback((id: string | null) => setSelectedId(id), [])
 
-  const addShape = useCallback((shape: Shape, parentId: string | null = null) => {
-    setRawShapes((current) => (parentId ? appendChild(current, parentId, shape) : [...current, shape]))
-    setSelectedId(shape.id)
-  }, [])
+  const addShape = useCallback(
+    (shape: Shape, parentId: string | null = null) => {
+      commit((current) => (parentId ? appendChild(current, parentId, shape) : [...current, shape]))
+      setSelectedId(shape.id)
+    },
+    [commit],
+  )
 
-  const updateShape = useCallback((id: string, updates: Partial<Shape>) => {
-    setRawShapes((current) => updateNodeInTree(current, id, updates))
-  }, [])
+  const updateShape = useCallback(
+    (id: string, updates: Partial<Shape>, group?: string) => {
+      commit((current) => {
+        const node = findNode(current, id)
+        if (!node) return current
+        if (!hasChanges(node, updates)) return current
+        return updateNodeInTree(current, id, updates)
+      }, group)
+    },
+    [commit],
+  )
 
-  const removeShape = useCallback((id: string) => {
-    setRawShapes((current) => removeNodeFromTree(current, id))
-    setSelectedId((current) => (current === id ? null : current))
-  }, [])
+  const removeShape = useCallback(
+    (id: string) => {
+      commit((current) => removeNodeFromTree(current, id))
+      setSelectedId((current) => (current === id ? null : current))
+    },
+    [commit],
+  )
 
-  const duplicateShape = useCallback((id: string) => {
-    const cloneId = createNodeId()
-    let created = false
-
-    setRawShapes((current) => {
-      const node = findNode(current, id)
-      if (!node) return current
+  const duplicateShape = useCallback(
+    (id: string) => {
+      const source = findNode(rawShapes, id)
+      if (!source) return
 
       const clone = cloneWithNewIds({
-        ...node,
-        id: cloneId,
-        name: `${node.name} copy`,
-        x: node.x + 16,
-        y: node.y + 16,
+        ...source,
+        name: `${source.name} copy`,
+        x: source.x + 16,
+        y: source.y + 16,
       })
-      created = true
-      return insertAfter(current, id, clone) ?? current
-    })
 
-    if (created) setSelectedId(cloneId)
-  }, [])
+      commit((current) => insertAfter(current, id, clone) ?? current)
+      setSelectedId(clone.id)
+    },
+    [commit, rawShapes],
+  )
 
-  const reorderShape = useCallback((id: string, parentId: string | null, index?: number) => {
-    setRawShapes((current) => moveNodeTo(current, id, parentId, index ?? Number.MAX_SAFE_INTEGER))
-  }, [])
+  const reorderShape = useCallback(
+    (id: string, parentId: string | null, index?: number) => {
+      commit((current) => moveNodeTo(current, id, parentId, index ?? Number.MAX_SAFE_INTEGER))
+    },
+    [commit],
+  )
 
-  const toggleVisibility = useCallback((id: string) => {
-    setRawShapes((current) => {
-      const node = findNode(current, id)
-      if (!node) return current
-      return updateNodeInTree(current, id, { visible: !node.visible })
-    })
-  }, [])
+  const toggleVisibility = useCallback(
+    (id: string) => {
+      commit((current) => {
+        const node = findNode(current, id)
+        if (!node) return current
+        return updateNodeInTree(current, id, { visible: !node.visible })
+      })
+    },
+    [commit],
+  )
 
-  const toggleLock = useCallback((id: string) => {
-    setRawShapes((current) => {
-      const node = findNode(current, id)
-      if (!node) return current
-      return updateNodeInTree(current, id, { locked: !node.locked })
-    })
-  }, [])
+  const toggleLock = useCallback(
+    (id: string) => {
+      commit((current) => {
+        const node = findNode(current, id)
+        if (!node) return current
+        return updateNodeInTree(current, id, { locked: !node.locked })
+      })
+    },
+    [commit],
+  )
+
+  const undo = useCallback(() => dispatch({ type: 'undo' }), [])
+  const redo = useCallback(() => dispatch({ type: 'redo' }), [])
 
   return {
     shapes,
@@ -114,6 +209,8 @@ export function useShapes(): UseShapesResult {
     selectedShape,
     selectedParentId,
     flat,
+    canUndo: document.past.length > 0,
+    canRedo: document.future.length > 0,
     select,
     addShape,
     updateShape,
@@ -122,7 +219,21 @@ export function useShapes(): UseShapesResult {
     reorderShape,
     toggleVisibility,
     toggleLock,
+    undo,
+    redo,
   }
+}
+
+function createInitialState(): DocumentState {
+  return { shapes: loadShapes(), past: [], future: [], lastGroup: null }
+}
+
+/** Правка ничего не меняет — значит, её не нужно ни применять, ни запоминать. */
+function hasChanges(node: Shape, updates: Partial<Shape>): boolean {
+  return Object.entries(updates).some(([key, value]) => {
+    const current = (node as unknown as Record<string, unknown>)[key]
+    return !Object.is(current, value)
+  })
 }
 
 function createNodeId(): string {
