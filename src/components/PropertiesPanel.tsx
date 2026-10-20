@@ -125,6 +125,22 @@ export function PropertiesPanel({ shape, onUpdate, onDuplicate, onDelete }: Prop
         </div>
       </Field>
 
+      {shape.type === 'image' ? (
+        <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-white/8 bg-white/3 p-2">
+          <img
+            src={shape.image.src}
+            alt={shape.image.alt}
+            className="size-11 shrink-0 rounded-md border border-white/10 object-cover"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-[11px] font-medium text-[#b9b4d1]">{shape.image.alt}</p>
+            <p className="mt-0.5 text-[10px] text-[#6f6d82]">
+              {Math.round(shape.width)} × {Math.round(shape.height)} px
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {shape.type === 'vector' ? (
         <>
           <Field label="Stroke">

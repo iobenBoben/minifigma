@@ -11,6 +11,7 @@ import type { Tool } from './types/shape'
 
 export default function App() {
   const [activeTool, setActiveTool] = useState<Tool>(DEFAULT_TOOL)
+  const [pendingImage, setPendingImage] = useState<{ file: File; token: number } | null>(null)
   const {
     shapes,
     flat,
@@ -42,6 +43,10 @@ export default function App() {
     if (selectedId) select(null)
   }, [select, selectedId])
 
+  const handleImageSelected = useCallback((file: File) => {
+    setPendingImage({ file, token: Date.now() })
+  }, [])
+
   useHotkeys({
     onToolChange: setActiveTool,
     onDelete: handleDelete,
@@ -58,11 +63,16 @@ export default function App() {
         flat={flat}
         selectedId={selectedId}
         activeTool={activeTool}
+        pendingImage={pendingImage}
         onAddShape={addShape}
         onUpdateShape={updateShape}
         onSelect={select}
       />
-      <Toolbar activeTool={activeTool} onToolChange={setActiveTool} />
+      <Toolbar
+        activeTool={activeTool}
+        onToolChange={setActiveTool}
+        onImageSelected={handleImageSelected}
+      />
 
       <aside className="absolute right-4 top-4 z-20 flex h-[calc(100%-2rem)] w-64 flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#14161c]/95 shadow-[0_18px_60px_rgba(0,0,0,0.5)] backdrop-blur">
         <header className="flex items-center justify-between border-b border-white/8 px-4 py-4">

@@ -180,10 +180,17 @@ function LayerRow({
                 ? 'rounded-[2px] bg-transparent'
                 : shape.type === 'text'
                   ? 'rounded-[1px] bg-[#f2f4fb]'
-                  : 'rounded-[2px]'
+                  : shape.type === 'image'
+                    ? 'rounded-[2px] bg-[#3a4054]'
+                    : 'rounded-[2px]'
           }`}
           style={{
-            backgroundColor: shape.type === 'frame' ? 'transparent' : shape.fill,
+            backgroundColor:
+              shape.type === 'frame'
+                ? 'transparent'
+                : shape.type === 'image'
+                  ? '#3a4054'
+                  : shape.fill,
             borderColor: shape.type === 'frame' ? '#6f6d82' : shape.stroke,
           }}
         />

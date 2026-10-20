@@ -53,6 +53,7 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onAutoHeight, onSelect 
   const isEllipse = shape.type === 'ellipse'
   const isText = shape.type === 'text'
   const isVector = shape.type === 'vector'
+  const isImage = shape.type === 'image'
 
   return (
     <div
@@ -61,7 +62,7 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onAutoHeight, onSelect 
       }`}
       style={{
         ...baseStyle,
-        backgroundColor: isText || isVector ? 'transparent' : shape.fill,
+        backgroundColor: isText || isVector || isImage ? 'transparent' : shape.fill,
         border: !isVector && shape.strokeWidth > 0 ? `${shape.strokeWidth}px solid ${shape.stroke}` : undefined,
         borderRadius: isEllipse ? (shape.radius > 0 ? shape.radius : '50%') : shape.radius,
       }}
@@ -96,6 +97,14 @@ function ShapeImpl({ shape, selectedId, isGhost = false, onAutoHeight, onSelect 
               ))
             : null}
         </svg>
+      ) : null}
+      {isImage ? (
+        <img
+          src={shape.image.src}
+          alt={shape.image.alt}
+          className="h-full w-full"
+          draggable={false}
+        />
       ) : null}
       {isText ? (
         <MeasuredText

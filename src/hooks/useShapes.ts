@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 
 import type { Shape } from '../types/shape'
+import { DEFAULT_IMAGE } from '../constants/tools'
 import { layoutTree } from '../utils/layout'
 import {
   appendChild,
@@ -279,9 +280,19 @@ function loadShapes(): Shape[] {
     if (!raw) return []
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
-    return parsed.filter(isShapeNode)
+    return parsed.filter(isShapeNode).map(withDefaults)
   } catch {
     return []
+  }
+}
+
+/** Документы, созданные до появления картинок, не содержат поля image — дополняем их. */
+function withDefaults(node: Shape): Shape {
+  const stored = (node as unknown as { image?: Partial<Shape['image']> }).image
+  return {
+    ...node,
+    image: { ...DEFAULT_IMAGE, ...(stored ?? {}) },
+    children: node.children.map(withDefaults),
   }
 }
 

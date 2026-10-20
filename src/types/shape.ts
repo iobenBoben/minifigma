@@ -1,6 +1,9 @@
-export type ShapeType = 'rectangle' | 'ellipse' | 'frame' | 'text' | 'vector'
+/** Инструменты рисования: каждый создаёт фигуру своего типа. */
+export type DrawTool = 'rectangle' | 'ellipse' | 'frame' | 'text' | 'vector'
 
-export type Tool = 'select' | ShapeType
+export type Tool = 'select' | DrawTool
+
+export type ShapeType = DrawTool | 'image'
 
 export type LayoutMode = 'none' | 'horizontal' | 'vertical'
 
@@ -58,6 +61,12 @@ export interface VectorProps {
   closed: boolean
 }
 
+export interface ImageProps {
+  /** Картинка хранится в документе как data URL, поэтому файл переживает перезагрузку. */
+  src: string
+  alt: string
+}
+
 export interface Shape {
   id: string
   name: string
@@ -77,5 +86,6 @@ export interface Shape {
   autoLayout: AutoLayout
   text: TextProps
   vector: VectorProps
+  image: ImageProps
   children: Shape[]
 }

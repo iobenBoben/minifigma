@@ -1,9 +1,12 @@
+import { useRef } from 'react'
+
 import { TOOLS } from '../constants/tools'
 import type { Tool } from '../types/shape'
 
 interface ToolbarProps {
   activeTool: Tool
   onToolChange: (tool: Tool) => void
+  onImageSelected: (file: File) => void
 }
 
 const TOOL_ICON_PATHS: Record<Tool, string> = {
@@ -15,7 +18,9 @@ const TOOL_ICON_PATHS: Record<Tool, string> = {
   vector: 'M4 19 19 4M19 4h-5M19 4v5M19 19H4M4 19v-5',
 }
 
-export function Toolbar({ activeTool, onToolChange }: ToolbarProps) {
+export function Toolbar({ activeTool, onToolChange, onImageSelected }: ToolbarProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   return (
     <aside className="absolute left-4 top-1/2 z-20 -translate-y-1/2 rounded-2xl border border-white/10 bg-[#151720]/95 p-1.5 shadow-[0_16px_50px_rgba(0,0,0,0.45)] backdrop-blur">
       <nav aria-label="Tools" className="flex flex-col gap-1">
@@ -55,6 +60,39 @@ export function Toolbar({ activeTool, onToolChange }: ToolbarProps) {
             </div>
           )
         })}
+        <span className="mx-2 my-1 block h-px bg-white/8" />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="group relative flex size-10 items-center justify-center rounded-xl text-[#86889e] transition hover:bg-white/7 hover:text-[#f2f4fb]"
+          aria-label="Place image"
+        >
+          <svg viewBox="0 0 24 24" fill="none" className="size-[18px]" aria-hidden="true">
+            <rect x="3.5" y="5.5" width="17" height="13" rx="2" stroke="currentColor" strokeWidth="1.7" />
+            <circle cx="9" cy="10" r="1.6" fill="currentColor" />
+            <path
+              d="m4.5 17 4.5-4.5 3 3 3-3 4.5 4.5"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="pointer-events-none absolute left-12 hidden whitespace-nowrap rounded-lg border border-white/10 bg-[#1b1d27] px-2.5 py-1.5 text-[10px] font-medium text-[#d9d6ea] shadow-xl group-hover:block">
+            Image
+          </span>
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            if (file) onImageSelected(file)
+            event.target.value = ''
+          }}
+        />
       </nav>
     </aside>
   )

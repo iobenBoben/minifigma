@@ -1,5 +1,6 @@
 import type {
   AutoLayout,
+  ImageProps,
   Shape,
   ShapeType,
   TextProps,
@@ -37,6 +38,7 @@ export const SHAPE_PALETTE: Record<ShapeType, { fill: string; stroke: string }> 
   frame: { fill: 'transparent', stroke: '#5a5d72' },
   text: { fill: '#f2f4fb', stroke: 'transparent' },
   vector: { fill: 'transparent', stroke: '#8290ee' },
+  image: { fill: 'transparent', stroke: '#5a5d72' },
 }
 
 export const DEFAULT_FRAME_SIZE = { width: 480, height: 320 }
@@ -55,6 +57,11 @@ export const DEFAULT_AUTO_LAYOUT: AutoLayout = {
 export const DEFAULT_VECTOR: VectorProps = {
   vertices: [],
   closed: false,
+}
+
+export const DEFAULT_IMAGE: ImageProps = {
+  src: '',
+  alt: '',
 }
 
 export const DEFAULT_TEXT: TextProps = {
@@ -93,7 +100,9 @@ export function createShape(
           ? 'Rectangle'
           : type === 'vector'
             ? 'Path'
-            : 'Ellipse',
+            : type === 'image'
+              ? 'Image'
+              : 'Ellipse',
     type,
     x,
     y,
@@ -110,6 +119,7 @@ export function createShape(
     autoLayout: isFrame ? { ...DEFAULT_AUTO_LAYOUT, mode: 'vertical' } : { ...DEFAULT_AUTO_LAYOUT },
     text: { ...DEFAULT_TEXT },
     vector: { ...DEFAULT_VECTOR, vertices: [] },
+    image: { ...DEFAULT_IMAGE },
     children: [],
   }
 }

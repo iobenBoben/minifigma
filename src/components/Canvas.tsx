@@ -5,6 +5,7 @@ import { DEFAULT_FRAME_SIZE, DEFAULT_TOOL, SHAPE_PALETTE, createShape } from '..
 import { useViewport } from '../hooks/useViewport'
 import type { Point, Shape as ShapeModel, ShapeType, Tool, VectorVertex } from '../types/shape'
 import { clamp, rectFromPoints, screenToCanvas } from '../utils/geometry'
+import { loadImageFile } from '../utils/image'
 import { isLockedInTree, findNode } from '../utils/tree'
 import { buildPathData, normalizeVertices } from '../utils/vector'
 import { Shape } from './Shape'
@@ -28,11 +29,30 @@ type Handle = keyof typeof CURSORS
 
 const EMPTY_VERTICES: VectorVertex[] = []
 
+function hasImageFile(transfer: DataTransfer | null): boolean {
+  if (!transfer) return false
+  return Array.from(transfer.items).some(
+    (item) => item.kind === 'file' && item.type.startsWith('image/'),
+  )
+}
+
+function firstImageFile(transfer: DataTransfer | null): File | null {
+  if (!transfer) return null
+  for (const item of Array.from(transfer.items)) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue
+    const file = item.getAsFile()
+    if (file) return file
+  }
+  return null
+}
+
 interface CanvasProps {
   shapes: ShapeModel[]
   flat: ReturnType<typeof import('../utils/tree').flattenTree>
   selectedId: string | null
   activeTool: Tool
+  /** Картинка, выбранная в панели инструментов: холст сам ставит её в центр. */
+  pendingImage: { file: File; token: number } | null
   onAddShape: (shape: ShapeModel, parentId?: string | null) => void
   onUpdateShape: (id: string, updates: Partial<ShapeModel>, group?: string) => void
   onSelect: (id: string | null) => void
@@ -73,6 +93,7 @@ export function Canvas({
   flat,
   selectedId,
   activeTool,
+  pendingImage,
   onAddShape,
   onUpdateShape,
   onSelect,
@@ -133,6 +154,39 @@ export function Canvas({
     },
     [flat],
   )
+
+  /** Ставит картинку в указанную точку холста: верхний левый угол встаёт под курсор. */
+  const placeImage = useCallback(
+    async (file: File, point: Point) => {
+      const loaded = await loadImageFile(file)
+      const parentId = frameUnderPoint(point)
+      const parent = parentId ? flat.find((item) => item.node.id === parentId) : undefined
+      const created = createShape('image', 0, 0, loaded.width, loaded.height)
+
+      created.x = parent ? point.x - parent.worldX : point.x
+      created.y = parent ? point.y - parent.worldY : point.y
+      created.image = { src: loaded.src, alt: file.name }
+
+      onAddShape(created, parentId)
+    },
+    [flat, frameUnderPoint, onAddShape],
+  )
+
+  // Картинка, выбранная через панель инструментов, встаёт в центр видимой области.
+  // Метка отсекает повторную вставку: effect перезапускается при изменении сцены.
+  const placedImageTokenRef = useRef(0)
+
+  useEffect(() => {
+    if (!pendingImage || pendingImage.token === placedImageTokenRef.current) return
+    placedImageTokenRef.current = pendingImage.token
+
+    const bounds = containerRef.current?.getBoundingClientRect()
+    const center = screenToCanvas(
+      { x: (bounds?.width ?? 0) / 2, y: (bounds?.height ?? 0) / 2 },
+      viewport,
+    )
+    void placeImage(pendingImage.file, center)
+  }, [pendingImage, placeImage, viewport])
 
   const finishPath = useCallback(
     (closed: boolean) => {
@@ -453,6 +507,15 @@ export function Canvas({
         }}
         onDoubleClick={() => {
           if (activeTool === 'vector') finishPath(false)
+        }}
+        onDragOver={(event) => {
+          if (hasImageFile(event.dataTransfer)) event.preventDefault()
+        }}
+        onDrop={(event) => {
+          const file = firstImageFile(event.dataTransfer)
+          if (!file) return
+          event.preventDefault()
+          void placeImage(file, toCanvas(event.clientX, event.clientY))
         }}
         onWheel={handleWheel}
         aria-label="Design canvas"
